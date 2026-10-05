@@ -2914,6 +2914,7 @@ void Gui::setSkin(const Skin* skin) {
 
 struct Editor::Impl {
     Gui gui;
+    void* parent = nullptr;   // the host window the view lives in
     Impl(std::shared_ptr<Skin> skin, State& state, Host& host) : gui(skin.get(), state, &host) {
         gui.watch(std::move(skin));
         gui.applyUi(state.ui());
@@ -2925,8 +2926,14 @@ Editor::Editor(std::shared_ptr<Skin> skin, State& state, Host& host)
 
 Editor::~Editor() { detach(); }
 
+// A host may move an open editor into another window of its own: Cubase's "Always on top" swaps the
+// plug-in window, and clap-wrapper's VST3 view hands the new one to set_parent without destroying the
+// GUI first (WrappedView::removed only forgets the old one). The view leaves the old window and opens
+// in the new one, or the new window stays empty.
 bool Editor::attach(void* parent) {
     Gui& g = impl_->gui;
+    if (g.window && parent != impl_->parent) detach();
+    impl_->parent = parent;
     if (!g.window) {
         g.state().setData(kModalKey, "");   // a new window never opens on a modal an old one left
         g.window = platformOpen(parent, &g);
