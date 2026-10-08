@@ -1802,6 +1802,8 @@ void keyLog(const char* fmt, ...) {
 
 bool Gui::wantsKeys() const { return !menus_.empty() || editing_on_ || live(listFocus_) || !modalShown_.empty(); }
 
+bool Gui::charPending() const { return charPending_; }
+
 // Text entry, a menu or a list is done with the keyboard. A skin with shortcuts keeps it anyway, since its
 // chords have to work without a click first; one without hands it back, as the editor always did.
 void Gui::releaseKeys() {
@@ -1896,6 +1898,7 @@ std::string Gui::tipText(const Hit& h) const {
 }
 
 bool Gui::keyDown(Key k, bool shift, bool ctrl, bool alt, unsigned ch, bool fromHost) {
+    charPending_ = false;   // set again below for a key whose character the text entry is still waiting for
     if (!menus_.empty()) {   // arrows move over the top menu's items (skipping separators, wrapping), Enter picks
         Menu& m = menus_.back();
         size_t level = menus_.size() - 1;
@@ -2006,6 +2009,12 @@ bool Gui::keyDown(Key k, bool shift, bool ctrl, bool alt, unsigned ch, bool from
         move = false;
         break;
     case KeyNone:
+        // A printable key: nothing to do with the key itself, since the character it types is the whole of
+        // it and comes next. The press is still the entry's, so the host never sees it, but the character
+        // that follows must reach keyChar rather than being taken along with the key. An Alt or Ctrl chord
+        // types nothing and so has no character to wait for; AltGr, which arrives as both of them held,
+        // types one and does.
+        charPending_ = (ctrl && alt) || (!ctrl && !alt);
         return true;
     }
     if (move && !shift) e.anchor = e.caret;
