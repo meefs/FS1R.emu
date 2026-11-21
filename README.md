@@ -28,8 +28,6 @@ In addition to the synth engine, FSVR features a robust and friendly GUI that al
 
 We hope you enjoy.
 
-Licensed GPLv3, see `LICENSE` and `NOTICE.md`.
-
 ## Demos
 
 ### FS1R DEMO SONG 1: Vokodrone
@@ -214,3 +212,7 @@ Ours, with no hardware counterpart:
 - [hollow/docs/](hollow/docs/) the plug-in framework: `framework.md` how a product is built on it, `skin-format.md` the skin's contract
 - [STATUS.md](STATUS.md) what is known, what is modelled and what nobody knows, with the open work at the end
 - [docs/findings.md](docs/findings.md) the research log, newest first, and the evidence behind each constant
+
+## License
+
+FSVR is free software under the GNU General Public License v3.0, in [LICENSE](LICENSE), with the provenance of each part in [NOTICE.md](NOTICE.md).
