@@ -164,13 +164,14 @@ Ours, with no hardware counterpart:
 - `src/kernel/` the scalar code of the filters and the tone generator a few lanes at a time, compiled once per instruction set
 - `src/engine/tuning.h` cost knobs, the control-rate decimation and the queue cap. Changing one must not change the output
 - `src/display/` how the FS1R shows values (transcribed from K_Take's [FS1R Editor](https://synth-voice.sakura.ne.jp/fs1r_editor_english.html), checked against the Data List and the ROM) and the editor's EG plots
+- `src/patchfiles/` patch files of every kind FSVR imports, read into banks of performances, voices and Fseqs, with a report of what was skipped and why
 - `src/io/smf.h` Standard MIDI File reading and offline rendering; `src/selftest/` the engine self check
 - `src/console/main.cpp` the test console: WinMM MIDI in and out, waveOut, offline render
 
 **Plugin.** The plug-in layer, which never models synthesis; it moves parameter values in and out of the engine as sysex, exactly as a hardware editor would.
 
 - `plugin/plugin.cpp` the processor: every param a sysex parameter change into `fsvr::Device`, the engine's own bulk dumps read back into the params, program change, the monitor, and the Save and Import menus' and bank manager's requests
-- `plugin/library.cpp` the bank manager's data: .syx files as banks (FS1R bulks, DX7 single voices and 32-voice banks), the factory bank and the user library folder; `audio_decode.cpp` and `audio_fseq.cpp` Import Audio
+- `plugin/library.cpp` the bank manager's data: patch files as banks (read by `src/patchfiles/`), the factory bank and the user library folder; `audio_decode.cpp` and `audio_fseq.cpp` Import Audio
 - `plugin/skin/` the editor, a [Hollow](hollow/) skin: views, params (`params.json`, 3,223 of them), images (at 1x in `images/`, at 0.5x, 0.75x, 1.5x and 2x in `scales/`) and its TrueType fonts, and `data/fs1r_sysex.json`, the address and packing of every param. This copy is the source: edit it with the web editor of the Hollow project (kept beside this repository, not published), which opens it by default and saves into it
 - `blender/` the skin's artwork as Blender components (the window's chrome, buttons, panels, displays, glyphs, logos, pots, faders, wheels and keys), `blender/scripts/` what builds and renders them into the skin at every scale, and `blender/textures/` the blue mottled chrome they share ([docs/editor.md](docs/editor.md), The art: Blender)
 - `plugin/generated/` the bundled factory banks `fs1r_presets.syx` with its index `fs1r_presets.csv`, `fs1r_performances.syx` and `fs1r_fseqs.syx`, packed from `presets/` by `tools/make_presets_blob.py`, and `parameterDescriptions_fs1r.json`, the 893 parameters with their sysex addresses and bit layouts, which the skin's param table was built from

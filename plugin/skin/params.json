@@ -37605,5 +37605,13 @@
   ],
   "default": 0,
   "host": false
+ },
+ {
+  "id": "master.volume",
+  "name": "Master Volume",
+  "min": 0,
+  "max": 128,
+  "default": 64,
+  "steps": 128
  }
 ]

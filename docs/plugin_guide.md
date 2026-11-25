@@ -35,7 +35,9 @@ The standalone's audio and MIDI settings are the last section of the **Options**
 
 ## The window
 
-The header is the unit's front panel: the performance's volume, the LCD, a pod of Save, Import, Editor and Keys buttons over the four part buttons, the Tone and KN knob modes and their four knobs, and the output monitor.
+The header is the unit's front panel: the Master Volume, the LCD, a pod of Save, Import, Editor and Keys buttons over the four part buttons, the Tone and KN knob modes and their four knobs, and the output monitor.
+
+- **Volume** is the Master Volume, FSVR's output level: 64 leaves it as the engine plays it, 0 takes it 24 dB down and 128 24 dB up. It is kept with the session in a host and with the standalone's state, and is no part of the performance, which has its own Volume on the Performance page.
 
 - **The LCD** shows the performance (click it for the factory performance menu; the arrows step through them), the selected part's voice and receive channel, the voices sounding (POLY) and the CPU. A user item shows as U and its number.
 - **Part 1 to 4** pick the part the edit pages show. Every part's params exist on their own, so a host automates a known part whichever is selected.
@@ -84,10 +86,10 @@ The Bank column holds the factory bank, **Yamaha FS1R** (the 384 performances, 1
 Your library is a folder of .syx files, one bank each: `Documents/FSVR/Library` (set `FSVR_LIBRARY` to use another). Every FSVR in every host shares it and notices when a file in it comes, goes or changes, so you can also manage it with a file manager.
 
 - **Save > Save Current Preset** saves the performance with its voices and its Fseq into one of your banks, or a new one, under the name you give it (12 characters). Saving under a name the bank already has replaces that preset. The built-in banks are read only, so they are not offered.
-- **Save > Export Current Preset** writes the performance as an `.fsvr` file, FSVR's own preset format, to share or keep outside the library. **Import > Import FSVR Preset** loads one and asks which bank to save it to.
-- **Import > Import FS1R SysEx to New Bank** copies a .syx into the library as a new bank named after the file (the name with a number after it if that is taken), shows it and loads the first thing in it. It takes FS1R performance, voice and Fseq dumps, including a whole unit's internal memory, DX7 single voices and DX7 32-voice banks. An `.fs1` file, which other FS1R editors save a performance as (its bulk and its four voices'), imports the same way, and one in the library folder is a bank like a .syx.
-- **Several files at once** (picked together in the Import dialog, or dropped together) become one bank, named after the folder they came from, and each performance in it keeps the voices and Fseq that came with it. A whole unit's dump, whose performances find their voices by internal number, still gets a bank of its own, since its numbers would clash with another file's.
-- **Drop .syx or .fs1 files on the editor** to import them, as the Import menu does.
+- **Save > Export Current Preset** writes the performance as an `.fsvr` file, FSVR's own preset format, to share or keep outside the library. Importing one `.fsvr` on its own loads it and asks which bank to save it to.
+- **Import > Import...** takes any patch file, read by what is in it rather than by its name. One file is copied into the library as a new bank named after the file (the name with a number after it if that is taken), shows it and loads the first thing in it. It takes FS1R performance, voice and Fseq dumps, including a whole unit's internal memory, DX7 single voices and DX7 32-voice banks. An `.fs1` file, which other FS1R editors save a performance as (its bulk and its four voices'), imports the same way, and one in the library folder is a bank like a .syx.
+- **Several files at once** (picked together in the Import dialog, or dropped together, `.fsvr` presets among them) become one bank, named after the folder they came from (a dropped folder, read through its subfolders up to 2,000 files, after itself), and each performance in it keeps the voices and Fseq that came with it. A whole unit's dump, whose performances find their voices by internal number, still gets a bank of its own, since its numbers would clash with another file's.
+- **Drop files or a folder on the editor** to import them, as the Import menu does. A file nothing can be read in is named on the status line, with the reason.
 - **Save > Export to FS1R SysEx** writes the whole unit, system settings included, as bulk dumps a real FS1R takes.
 - **Right-click a preset** to delete or rename it, or to edit, copy or paste its attributes (its category). The built-in banks' presets are read only, but their attributes open to read and copy.
 - **Right-click a bank** to delete or rename it. A deleted bank's file moves to the library's `Deleted` folder, so it can come back.

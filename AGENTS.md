@@ -26,7 +26,7 @@ The path tells you what a difference from a real FS1R means.
 | `src/engine/`, `src/presets/`, `src/effects/host/`, `src/filters/filter_host.*` | **Matches the FS1R** | you have a bug |
 | `src/tonegen/`, `src/modulators/` | **Tuned**, a model whose constants are in `cal.h` | it needs tuning |
 | `src/filters/`, `src/effects/`, `src/dsp/` (the DSP) | **Matches the FS1R**, bit for bit what its DSP programs compute | you changed the sound; `dsp_check` says so |
-| `src/device/`, `src/math/`, `src/display/`, `src/io/`, `src/selftest/`, `src/console/` | **Ours**, no hardware counterpart | nothing. The hardware has no opinion |
+| `src/device/`, `src/math/`, `src/display/`, `src/io/`, `src/selftest/`, `src/console/`, `src/patchfiles/` | **Ours**, no hardware counterpart | nothing. The hardware has no opinion |
 | `src/kernel/` | **Ours**: the scalar code of `filters/` (and in time `tonegen/`) a few lanes at a time, compiled once per instruction set | nothing; a hash that moves means a lane is not the scalar code, and `dsp_check` says so |
 | `src/engine/tuning.h` | our cost knobs | nothing, and changing one must not alter the output |
 | `plugin/` | the plug-in: processor, bank manager, Import Audio | it never models synthesis, see below |

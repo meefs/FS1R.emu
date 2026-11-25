@@ -81,7 +81,7 @@ It sets where the operator starts at key-on, not a relation it keeps. An operato
 
 **The FS1R.** 128 internal performances, and 128 internal voices with no Fseqs or 64 voices with six, in battery-backed RAM.
 
-**FSVR.** A folder of .syx files, each a bank, as many as you import or save to (Import > Import FS1R SysEx to New Bank names a new bank after the file). A performance's Int voices and Fseq mean its own bank's internal ones when the bank holds them, and your library's numbered ones otherwise. The factory banks are the FS1R's.
+**FSVR.** A folder of .syx files, each a bank, as many as you import or save to (Import > Import... names a new bank after the file). A performance's Int voices and Fseq mean its own bank's internal ones when the bank holds them, and your library's numbered ones otherwise. The factory banks are the FS1R's.
 
 ## Import Audio
 
