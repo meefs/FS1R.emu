@@ -909,7 +909,7 @@ int main() {
         }
     }
 
-    // Master Volume is a level on the output: 64 unity, 12 dB down at 0 and up at 128 (#67). The same note on three
+    // Master Volume is a level on the output: 64 unity, 24 dB down at 0 and up at 128 (#67). The same note on three
     // fresh instances, so each renders the same samples before its level.
     {
         auto peakAt = [&](double vol) {
@@ -922,8 +922,8 @@ int main() {
             return (double)s.peak;
         };
         const double down = peakAt(0), unity = peakAt(64), up = peakAt(128);
-        CHECK(unity > 0 && std::fabs(20 * std::log10(up / unity) - 12) < 0.01 && std::fabs(20 * std::log10(down / unity) + 12) < 0.01,
-              "Master Volume 0 and 128 are %+.2f and %+.2f dB from 64, not -12 and +12", 20 * std::log10(down / unity), 20 * std::log10(up / unity));
+        CHECK(unity > 0 && std::fabs(20 * std::log10(up / unity) - 24) < 0.01 && std::fabs(20 * std::log10(down / unity) + 24) < 0.01,
+              "Master Volume 0 and 128 are %+.2f and %+.2f dB from 64, not -24 and +24", 20 * std::log10(down / unity), 20 * std::log10(up / unity));
     }
 
     // A library the instance cannot read says so on the status line, rather than every bank just vanishing:

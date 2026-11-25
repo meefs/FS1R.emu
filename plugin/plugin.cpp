@@ -302,8 +302,8 @@ public:
         if (const int s = (int)std::lround(get(speed)); s != speedSent) dev.setSpeed(speedSent = s);
         if (const int f = (int)std::lround(get(filter32)); f != filter32Sent) dev.setFilterPoly32((filter32Sent = f) != 0);
         if (const int n = (int)std::lround(get(polyOpt)); n != polySent) dev.setPolyphony(kPoly[polySent = std::clamp(n, 0, 3)]);
-        // Master Volume, ours: a level on FSVR's output, 64 unity and 12 dB down at 0 and up at 128 (#67).
-        if (const double g = get(masterVol); g != gainSent) dev.setGain(std::pow(10.0, ((gainSent = g) - 64.0) * 12.0 / 64.0 / 20.0));
+        // Master Volume, ours: a level on FSVR's output, 64 unity and 24 dB down at 0 and up at 128 (#67).
+        if (const double g = get(masterVol); g != gainSent) dev.setGain(std::pow(10.0, ((gainSent = g) - 64.0) * 24.0 / 64.0 / 20.0));
         std::unique_lock<std::mutex> lk(ctl, std::try_to_lock);
         const unsigned loads = st.loads();
         const bool live = lk.owns_lock() && !(loads & 1) && loads == loadsSeen;

@@ -79,7 +79,7 @@
    "wheel": 0.029,
    "reset": "default",
    "param": "master.volume",
-   "tip": "FSVR's output level, 64 is unity, 0 and 128 are 12 dB down and up"
+   "tip": "FSVR's output level, 64 is unity, 0 and 128 are 24 dB down and up"
   },
   {
    "type": "number",
