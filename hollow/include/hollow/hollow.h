@@ -140,6 +140,11 @@ public:
     // in/out: channel pointers; outputs arrive zeroed, so a hollow product can leave them alone.
     virtual void process(const float* const* in, float* const* out, int frames) { (void)in; (void)out; (void)frames; }
 
+    // The host's transport at the first frame of the block process() renders, set by the format layer just
+    // before it: tempo in quarter notes a minute and the song position in quarter notes. valid is false where
+    // the host gives neither (DXi, a standalone with no host).
+    struct Transport { bool valid = false, playing = false; double tempo = 0, beats = 0; } transport;
+
     // The host is about to save the instance (main thread): put what State does not hold into its
     // text data now.
     virtual void saving() {}

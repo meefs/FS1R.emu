@@ -242,6 +242,10 @@ Effect::Effect(AudioMasterCallback m) : master(m) {
         for (int32_t c = 0; c < e->numOutputs; ++c) std::memset(out[c], 0, sizeof(float) * (size_t)n);
         s->guiMidi();
         s->frames = n;
+        s->proc->transport = {};
+        if (auto* ti = (const VstTimeInfo*)s->master(e, audioMasterGetTime, 0, kVstPpqPosValid | kVstTempoValid, nullptr, 0);
+            ti && (ti->flags & kVstPpqPosValid) && (ti->flags & kVstTempoValid))
+            s->proc->transport = {true, (ti->flags & kVstTransportPlaying) != 0, ti->tempo, ti->ppqPos};
         s->proc->process(in, out, n);
         float pk[2] = {0, 0};
         for (int32_t c = 0; c < e->numOutputs && c < 2; ++c)

@@ -272,6 +272,25 @@ public:
     }
 
     void midi(int frame, const uint8_t* b, int n) override {
+        if (n == 1 && b[0] == 0xF8) hostClock = true;   // a host that sends clock keeps it, and the transport makes none
+        queue(frame, b, n);
+    }
+
+    // A host hands a plug-in its tempo and song position, not MIDI clock (VST3, CLAP, AU), so the transport
+    // makes the clock a Formant Sequence on MIDI clock steps by: 24 a quarter note at the song position's own
+    // quarter notes while the host plays, and a Start where it starts (#108).
+    void transportClock(int frames) {
+        const bool on = !hostClock && transport.valid && transport.playing && transport.tempo > 0;
+        if (on && !playing) { const uint8_t s = 0xFA; queue(0, &s, 1); }
+        playing = on;
+        if (!on) return;
+        const double perFrame = transport.tempo / 60.0 * 24.0 / hostRate, c0 = transport.beats * 24.0;
+        const uint8_t c = 0xF8;
+        for (double k = std::ceil(c0); k < c0 + perFrame * frames; k += 1) queue((int)((k - c0) / perFrame), &c, 1);
+        std::stable_sort(ev, ev + events, [](const Event& a, const Event& b) { return a.frame < b.frame; });
+    }
+
+    void queue(int frame, const uint8_t* b, int n) {
         if (n <= 0 || events >= kEvents || used + (size_t)n > arena.size()) return;
         std::memcpy(arena.data() + used, b, (size_t)n);
         ev[events++] = {frame, used, n};
@@ -287,6 +306,7 @@ public:
         const unsigned loads = st.loads();
         const bool live = lk.owns_lock() && !(loads & 1) && loads == loadsSeen;
         if (live) syncParams();
+        transportClock(frames);
         int at = 0;
         for (int e = 0; e < events; ++e) {
             const int t = std::clamp(ev[e].frame, at, frames);
@@ -335,6 +355,7 @@ private:
     std::mutex ctl;
     unsigned loadsSeen = 0;
     double hostRate = fsvr::ENGINE_RATE;
+    bool hostClock = false, playing = false;   // transportClock
 
     // params by id
     int P(const std::string& id) const { return st.indexOf(id); }

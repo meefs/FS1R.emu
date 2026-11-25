@@ -177,8 +177,8 @@ struct Plugin final : Editor::Host {
         return true;
     }
 
-    // A pick in an audio list asks for the whole setup again with that one changed (a new API or output at
-    // its preferred rate); a MIDI input opens or closes, the others staying as they are.
+    // A pick in an audio list asks for the whole setup again with that one changed; a MIDI input opens or
+    // closes, the others staying as they are.
     void setDevice(int list, int item) override {
         if (!features || list < 0 || list > 5 || item < 0 || item >= (int)deviceIds[list].size()) return;
         if (list == 5) {
@@ -189,7 +189,9 @@ struct Plugin final : Editor::Host {
             return;
         }
         want[list] = deviceIds[list][(size_t)item];
-        if (list < 2) want[3] = "0";
+        // A new API or output keeps the running rate: the wrapper opens it where the device offers it and at the
+        // device's own rate where not. 0 matched no row while the request was pending, so the rate list showed
+        // its first, 4000 Hz in an ASIO driver's list (#104).
         clap_wrapper_standalone_audio_config_t c{};
         c.api_id = want[0].c_str();
         c.output_id = want[1].c_str();
@@ -290,6 +292,10 @@ struct Plugin final : Editor::Host {
         const float* const* in = p->audio_inputs_count ? p->audio_inputs[0].data32 : nullptr;
         midiOut = p->out_events;
         midiFrames = (int)p->frames_count;
+        proc->transport = {};
+        if (const clap_event_transport_t* tr = p->transport;
+            tr && (tr->flags & CLAP_TRANSPORT_HAS_TEMPO) && (tr->flags & CLAP_TRANSPORT_HAS_BEATS_TIMELINE))
+            proc->transport = {true, (tr->flags & CLAP_TRANSPORT_IS_PLAYING) != 0, tr->tempo, (double)tr->song_pos_beats / CLAP_BEATTIME_FACTOR};
         if (p->audio_outputs_count && p->audio_outputs[0].data32) {
             float* const* out = p->audio_outputs[0].data32;
             proc->process(in, out, (int)p->frames_count);

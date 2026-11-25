@@ -10,6 +10,10 @@
 # down: a host that sets the wrapper's parameters to their defaults played every note bent (detail/vst3/
 # parameter.cpp). The default is the centre, 8192 of 16383, which is no bend. Still so in v0.17.0.
 #
+# Its macOS standalone opens its window wherever MainMenu.xib put it, on whichever screen that lands on,
+# and never saves where it was moved to; the Windows standalone saves windowX and windowY. AppKit's frame
+# autosave keeps the position here, and the editor's own size stays as the plug-in set it (macos/AppDelegate.mm).
+#
 # One-line replaces rather than a patch file: Windows checkouts with core.autocrlf turn the fetched
 # source into CRLF, which a patch's context lines would not match. Runs on every configure, idempotent.
 function(hollow_patch_clap_wrapper file old new what)
@@ -37,4 +41,8 @@ function(hollow_fix_clap_wrapper dir)
     "v.stepCount = 16383;"
     "v.stepCount = 16383; v.defaultNormalizedValue = 8192.5 / 16383;   // hollow: pitch bend rests at the centre, 8192 once the wrapper truncates it"
     "VST3 pitch bend defaults to the centre")
+  hollow_patch_clap_wrapper("${dir}/src/detail/standalone/macos/AppDelegate.mm"
+    "ui->show(p);"
+    "ui->show(p); { NSWindow *mw = [self window]; const NSSize sz = [[mw contentView] frame].size; const BOOL saved = [mw setFrameUsingName:@\"MainWindow\"]; [mw setFrameAutosaveName:@\"MainWindow\"]; const NSPoint top = NSMakePoint(NSMinX([mw frame]), NSMaxY([mw frame])); [mw setContentSize:sz]; if (saved) [mw setFrameTopLeftPoint:top]; if (!saved || ![mw screen]) [mw center]; }   // hollow: the window opens where it was closed, at the editor's own size, or centred the first time and when that screen is gone"
+    "macOS standalone keeps its window position")
 endfunction()
