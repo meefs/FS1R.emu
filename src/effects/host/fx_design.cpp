@@ -1,5 +1,4 @@
-// The filter designer and the small float helpers. Each line is one step of the firmware's
-// arithmetic, in its precision and its order, so the words come out bit for bit.
+// The filter designer and the small float helpers. Each line is one step of the FS1R's arithmetic, in its precision and its order, so the words come out bit for bit.
 #include "effects/host/effect_host.h"
 
 namespace fsvr::vop3host {
@@ -31,8 +30,7 @@ float bump(float w, double by)
 //   t = tan(pi f / fs) from the TAN table, G = 10^((gain-64)/20), Gi its inverse, Gs/Gsi the
 //   square roots, w = 10 t / q. The words are b0, b1, -a1 (order 1) or b0, b1, b2, -a1, -a2
 //   (order 2), scaled by 2048 * (16 >> scale) and rounded with a sum-of-errors compensation.
-//   Lower-case names are single precision; T, T2 and the casts mark where the firmware
-//   computes in double.
+//   Lower-case names are single precision; T, T2 and the casts mark where the FS1R computes in double.
 void EffectHost::designFilter(int order, int scale, int kind, int freq, int gain, int q, const uint16_t* steps)
 {
     order &= 0xFF; scale &= 0xFF; kind &= 0xFF; freq &= 0xFF;
@@ -189,7 +187,7 @@ void EffectHost::designFilter(int order, int scale, int kind, int freq, int gain
         writeCoefs(3, steps);
         return;
     }
-    // five words (b0, b1, b2, -a1, -a2), rounded in the firmware's order
+    // five words (b0, b1, b2, -a1, -a2), rounded in the FS1R's order
     float w0 = round_word(S, c0), w1 = round_word(S, c1), w3 = round_word(S, c3);
     float w2 = round_word(S, c2), w4 = round_word(S, c4);
     const float e0 = word_error(S, c0, w0), e1 = word_error(S, c1, w1), e3 = word_error(S, c3, w3);

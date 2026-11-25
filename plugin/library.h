@@ -42,7 +42,7 @@ public:
     // FSVR can read in <file>: <reason>"); report says what was skipped.
     int import(const std::string& path, std::string& err, Report* report = nullptr);
     // Several files as one new bank, named name or else after their folder, each performance keeping the voices and Fseq
-    // that came with it. A file holding internal memory (a unit's dump, whose performances name their voices
+    // that came with it. A file holding internal memory (an FS1R's dump, whose performances name their voices
     // by number) is a bank of its own, as import() makes it, since its numbers would meet another file's.
     // The files are read as one stream, so a supplement in one pairs with the bank in the next. A file with no
     // FS1R performance (DX banks and their performances) is kept as it was, ahead of the rest; another

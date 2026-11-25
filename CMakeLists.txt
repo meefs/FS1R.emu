@@ -1,6 +1,6 @@
-# fs1rLib          the engine, no Windows, no host, no GUI. This is what the plug-in links.
+# fsvrLib          the engine, no Windows, no host, no GUI. This is what the plug-in links.
 # fsvr_console     the test console (WinMM, Windows only), built into bin/.
-# render_capture   the renderer behind the calibration loop, into bin/.
+# fsvr_render      offline renders of a MIDI file or a held note on any platform, into bin/.
 # wavetrace        a voice's operators sample by sample at several notes, into bin/.
 # perfbench        the engine's cost on fixed scenarios, its output hashed, into bin/ (docs/performance.md).
 # With FSVR_BUILD_PLUGIN, the plug-in: Hollow (hollow/) with the FSVR skin (plugin/), every format the
@@ -29,7 +29,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 # Everything meant to be run lands in bin/: the console here, the plug-in formats under bin/<Format>/.
-set(FS1R_BIN ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+set(FSVR_BIN ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 # The two hosts and the filters and effects they drive. They are bit-exact only without FMA contraction, so they
 # are a library of their own with its own flags; excess precision effect_host.h refuses at compile time.
@@ -97,7 +97,7 @@ foreach(t vop3host)
   endif()
 endforeach()
 
-add_library(fs1rLib STATIC
+add_library(fsvrLib STATIC
     src/tonegen/operator.cpp
     src/tonegen/channel.cpp
     src/engine/render.cpp
@@ -127,8 +127,8 @@ add_library(fs1rLib STATIC
     src/patchfiles/performance.cpp
     src/selftest/selftest.cpp
     src/selftest/patchfiles.cpp)
-target_include_directories(fs1rLib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(fs1rLib PUBLIC vop3host)
+target_include_directories(fsvrLib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(fsvrLib PUBLIC vop3host)
 # The sample loop's maths backend, src/math/fastmath.h: LUT (the default, and the fastest measured), RAW
 # (libm, kept for A/B renders), CORDIC, or HYBRID, where the table seeds a short CORDIC rotation.
 set(FSVR_MATH "LUT" CACHE STRING "fastmath backend: RAW, LUT, CORDIC or HYBRID")
@@ -138,51 +138,51 @@ list(FIND _fsvr_math_names "${FSVR_MATH}" _fsvr_math_id)
 if(_fsvr_math_id LESS 0)
   message(FATAL_ERROR "FSVR_MATH must be RAW, LUT, CORDIC or HYBRID, not ${FSVR_MATH}")
 endif()
-target_compile_definitions(fs1rLib PUBLIC FSVR_MATH=${_fsvr_math_id})
-target_compile_definitions(fs1rLib PRIVATE FSVR_HAVE_SSE2=${FSVR_HAVE_SSE2} FSVR_HAVE_AVX2=${FSVR_HAVE_AVX2} FSVR_HAVE_NEON=${FSVR_HAVE_NEON})
+target_compile_definitions(fsvrLib PUBLIC FSVR_MATH=${_fsvr_math_id})
+target_compile_definitions(fsvrLib PRIVATE FSVR_HAVE_SSE2=${FSVR_HAVE_SSE2} FSVR_HAVE_AVX2=${FSVR_HAVE_AVX2} FSVR_HAVE_NEON=${FSVR_HAVE_NEON})
 foreach(isa IN LISTS FSVR_ISAS)
   fsvr_kernel_objects(fsvr_tg_kernel_${isa} ${isa} ${FSVR_TG_KERNELS})
   target_compile_definitions(fsvr_tg_kernel_${isa} PRIVATE FSVR_MATH=${_fsvr_math_id})
-  target_sources(fs1rLib PRIVATE $<TARGET_OBJECTS:fsvr_tg_kernel_${isa}>)
+  target_sources(fsvrLib PRIVATE $<TARGET_OBJECTS:fsvr_tg_kernel_${isa}>)
 endforeach()
 if(MSVC)
-  target_compile_options(fs1rLib PRIVATE /W3 /fp:precise)
+  target_compile_options(fsvrLib PRIVATE /W3 /fp:precise)
 else()
-  target_compile_options(fs1rLib PRIVATE -Wall -Wno-unused-function)
+  target_compile_options(fsvrLib PRIVATE -Wall -Wno-unused-function)
 endif()
 
-# The renderer behind the calibration loop. The console does this too, but only on Windows, and
-# tools/analyze_capture.py needs a render of every capture request to compare a recording against.
-add_executable(render_capture tools/render_capture.cpp)
-target_link_libraries(render_capture PRIVATE fs1rLib)
-set_target_properties(render_capture PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<1:${FS1R_BIN}>")
+# Offline renders anywhere. The console does this too, but only on Windows; tests/regress.py and tests/abcheck.py use this
+# one everywhere else.
+add_executable(fsvr_render tools/fsvr_render.cpp)
+target_link_libraries(fsvr_render PRIVATE fsvrLib)
+set_target_properties(fsvr_render PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<1:${FSVR_BIN}>")
 # A voice's operators sample by sample at several notes, as a table and a PNG (AGENTS.md, Tracing a waveform).
 add_executable(wavetrace tools/wavetrace.cpp)
-target_link_libraries(wavetrace PRIVATE fs1rLib)
-set_target_properties(wavetrace PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<1:${FS1R_BIN}>")
+target_link_libraries(wavetrace PRIVATE fsvrLib)
+set_target_properties(wavetrace PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<1:${FSVR_BIN}>")
 # The engine's cost on fixed scenarios and its output hashed, the record docs/performance.md is kept from.
 add_executable(perfbench tools/perfbench.cpp)
-target_link_libraries(perfbench PRIVATE fs1rLib)
-set_target_properties(perfbench PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<1:${FS1R_BIN}>")
+target_link_libraries(perfbench PRIVATE fsvrLib)
+set_target_properties(perfbench PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<1:${FSVR_BIN}>")
 
 enable_testing()
 
 if(WIN32)
   add_executable(fsvr_console src/console/main.cpp)
-  target_link_libraries(fsvr_console PRIVATE fs1rLib winmm)
-  set_target_properties(fsvr_console PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<1:${FS1R_BIN}>")
+  target_link_libraries(fsvr_console PRIVATE fsvrLib winmm)
+  set_target_properties(fsvr_console PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<1:${FSVR_BIN}>")
   # The license and the notices beside it, for the console's release zip.
   add_custom_command(TARGET fsvr_console POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E copy "${PROJECT_SOURCE_DIR}/LICENSE" "${FS1R_BIN}/FSVR-LICENSE.txt"
-    COMMAND "${CMAKE_COMMAND}" -E copy "${PROJECT_SOURCE_DIR}/NOTICE.md" "${FS1R_BIN}/FSVR-NOTICE.md"
+    COMMAND "${CMAKE_COMMAND}" -E copy "${PROJECT_SOURCE_DIR}/LICENSE" "${FSVR_BIN}/FSVR-LICENSE.txt"
+    COMMAND "${CMAKE_COMMAND}" -E copy "${PROJECT_SOURCE_DIR}/NOTICE.md" "${FSVR_BIN}/FSVR-NOTICE.md"
     VERBATIM)
   add_test(NAME engine COMMAND fsvr_console -selftest)
   add_test(NAME engine-sse2 COMMAND fsvr_console -selftest)
   set_tests_properties(engine-sse2 PROPERTIES ENVIRONMENT FSVR_SIMD=sse2)
 else()
-  message(STATUS "fsvr_console needs WinMM; building fs1rLib only")
-  add_executable(engine_selftest tools/engine_selftest.cpp)
-  target_link_libraries(engine_selftest PRIVATE fs1rLib)
+  message(STATUS "fsvr_console needs WinMM; building fsvrLib only")
+  add_executable(engine_selftest tests/engine_selftest.cpp)
+  target_link_libraries(engine_selftest PRIVATE fsvrLib)
   add_test(NAME engine COMMAND engine_selftest)
   if(FSVR_HAVE_SSE2)
     add_test(NAME engine-sse2 COMMAND engine_selftest)
@@ -190,9 +190,8 @@ else()
   endif()
 endif()
 
-# The filters' and effects' output, pinned (verified bit for bit against the firmware's DSP programs before
-# those moved to the VOP3 project).
-add_executable(dsp_check tools/dsp_check.cpp)
+# The filters' and effects' output, pinned: bit for bit what the FS1R's DSP programs compute, checked against the VOP3 project's core.
+add_executable(dsp_check tests/dsp_check.cpp)
 target_link_libraries(dsp_check PRIVATE vop3host)
 if(NOT MSVC)
   target_compile_options(dsp_check PRIVATE -ffp-contract=off)
@@ -205,7 +204,7 @@ if(FSVR_HAVE_SSE2)
 endif()
 find_package(Python3 COMPONENTS Interpreter)
 if(FSVR_HAVE_AVX2 AND Python3_Interpreter_FOUND)
-  add_test(NAME isa COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_isa.py avx2
+  add_test(NAME isa COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_isa.py avx2
            $<TARGET_OBJECTS:fsvr_kernel_2> $<TARGET_OBJECTS:fsvr_tg_kernel_2> COMMAND_EXPAND_LISTS)
 endif()
 # Their cost per sample, and the output's hash (not a test: a number to compare builds by).

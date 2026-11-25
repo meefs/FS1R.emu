@@ -58,7 +58,7 @@ int selftest(Synth& S) {
         {0x31, 0, 0x0E, 20, "part 2 pan"},
         {0x42, 0, 0x54, 2, "part 3 voice filter type"},
         {0x63, 5, 0x16, 77, "part 4 op 6 level"},
-        {0x60, 1, 0x05, 5 << 3 | 1, "part 1 op 2 skirt"},   // what captures/sweep.py skirt sweeps
+        {0x60, 1, 0x05, 5 << 3 | 1, "part 1 op 2 skirt"},
     };
     for (auto& t : pc) {
         uint8_t m[10] = {0xF0, 0x43, 0x10, 0x5E, (uint8_t)t.ah, (uint8_t)t.am, (uint8_t)t.al, 0, (uint8_t)t.v, 0xF7};
@@ -75,9 +75,7 @@ int selftest(Synth& S) {
     }
     ck("the voice image followed the change", S.perf.part[2].voice.raw[0x54] == 2);
     ck("op level decode followed the change", S.perf.part[3].voice.v[5].level == 77);
-    // The chip's EG key rate scaling, against the 24 rates 02_envelope_3 measured. Key codes 85, 93
-    // and 101 are notes 36, 60 and 84; the rows are the rate offset at time scaling 0 to 7, and the
-    // truncation toward zero is what separates the middle row from a flooring divide. docs/aeg.md.
+    // The chip's EG key rate scaling, against 24 rates measured on the FS1R. Key codes 85, 93 and 101 are notes 36, 60 and 84; the rows are the rate offset at time scaling 0 to 7, and the truncation toward zero is what separates the middle row from a flooring divide.
     {
         const int kc[3] = {85, 93, 101};
         const int want[3][8] = {{0, -1, -2, -3, -5, -6, -7, -8},
@@ -85,7 +83,7 @@ int selftest(Synth& S) {
                                 {0, 0, 1, 1, 2, 2, 3, 3}};
         for (int n = 0; n < 3; n++)
             for (int t = 0; t < 8; t++) ck("EG rate scaling", eg_ratescale(t, kc[n]) == want[n][t]);
-        // and 10_envelope2's ten key codes, one note per octave from 12 to 120, at time scaling 7 and 3
+        // and ten more key codes measured on the FS1R, one note per octave from 12 to 120, at time scaling 7 and 3
         const int kc2[10] = {77, 81, 85, 89, 93, 97, 101, 105, 109, 113};
         const int w7[10] = {-11, -11, -8, -4, -1, 1, 3, 7, 10, 11};
         const int w3[10] = {-4, -4, -3, -1, 0, 0, 1, 3, 4, 4};
@@ -94,18 +92,17 @@ int selftest(Synth& S) {
             ck("EG rate scaling, tscale 3", eg_ratescale(3, kc2[n]) == w3[n]);
         }
         ck("EG rate scaling saturates low", eg_ratescale(7, 60) == -11);
-        ck("key code 87, the demo drum's note 41, reads -8 (19_drums)", eg_keyoff(87) == -8);
-        // 21_keycode, every semitone: saturated below 82 and above 109, and the hold does not scale
-        ck("key code table ends (21_keycode)", eg_keyoff(70) == -13 && eg_keyoff(81) == -13 && eg_keyoff(82) == -12 && eg_keyoff(109) == 12 && eg_keyoff(110) == 13 && eg_keyoff(127) == 13);
+        ck("key code 87, the demo drum's note 41, reads -8", eg_keyoff(87) == -8);
+        // every semitone: saturated below 82 and above 109, and the hold does not scale
+        ck("key code table ends", eg_keyoff(70) == -13 && eg_keyoff(81) == -13 && eg_keyoff(82) == -12 && eg_keyoff(109) == 12 && eg_keyoff(110) == 13 && eg_keyoff(127) == 13);
         { EG lo, hi; int L[4] = {0, 0, 0, 63}, R[4] = {0, 34, 0, 0}; lo.start(L, R, 40, -11); hi.start(L, R, 40, 11);
-          ck("hold length ignores the key code (21_keycode)", lo.holdLeft == hi.holdLeft); }
+          ck("hold length ignores the key code", lo.holdLeft == hi.holdLeft); }
         ck("EG rate scaling saturates high", eg_ratescale(7, 127) == 11);
     }
-    // The formant window against the bandwidth byte, 04_formant_1's own staircase: flat to 40, opening
-    // from 44, halving every eight steps after that.
+    // The formant window against the bandwidth byte, the FS1R's own staircase: flat to 40, opening from 44, halving every eight steps after that.
     {
-        // The window is a time, so its length in periods scales with the fundamental and its width in Hz
-        // does not. Both are checked here because getting the units wrong is what cost two fitted knees.
+        // The window is a time, so its length in periods scales with the fundamental and its width in Hz does not.
+        // Both are checked here, since the same law read in periods puts its knee at a different byte at every note.
         auto hz = [](double bw) { return cal::FRMT_BW_HZ0 * pow(2.0, bw / cal::FRMT_BW_DB); };
         auto wl = [&](double bw, double f0) { return std::min(cal::FRMT_WL_MAX, f0 / hz(bw)); };
         ck("formant bandwidth doubles every eight", fabs(hz(56) / hz(48) - 2.0) < 1e-9);
@@ -114,10 +111,8 @@ int selftest(Synth& S) {
            fabs(wl(72, 65.41) * 4.0 - wl(72, 261.64)) < 1e-6);
         ck("the window clamps at two periods", wl(0, 261.64) == cal::FRMT_WL_MAX);
     }
-    // The skirt multiplies the window exponent, it does not step it. A sin^(2n) window one grain period
-    // long puts its lines on the binomial row C(2n, n-k), which is what res2 gives the unit: 6.02 dB down
-    // either side at skirt 0, 3.52 and 15.56 at skirt 1. Checking the table against those rows pins the
-    // law and the doubling at once, and the sine table's own interpolation with them.
+    // The skirt multiplies the window exponent, it does not step it. A sin^(2n) window one grain period long puts its lines on the binomial row C(2n, n-k), which is what res2 gives on the FS1R, 6.02 dB down either side at skirt 0, 3.52 and 15.56 at skirt 1.
+    // Checking the table against those rows pins the law and the doubling at once, and the sine table's own interpolation with them.
     {
         auto line = [&](int s, int k) {          // the k-th Fourier coefficient of g_win[0][s]
             double re = 0;
@@ -139,15 +134,13 @@ int selftest(Synth& S) {
         double dc = 0; for (int i = 0; i < 1024; i++) dc += g_win[0][0][i] - g_winDC[0][0];
         ck("all2 at skirt 0 carries no DC", fabs(dc) < 1e-3);
     }
-    // Register 0xC0 against the note. docs/ymp706_registers.md used to gloss it as "note/3 + 10", which is
-    // out by 63 and is what made the old rate scaling look like dead code when it was merely wrong.
+    // Register 0xC0, the key code, against the note; "note/3 + 10" is out by 63.
     {
         const int note[5] = {0, 36, 60, 84, 127};
         const int want[5] = {73, 85, 93, 101, 116};
         for (int i = 0; i < 5; i++) ck("key code register", (NOTETAB[note[i]] >> 8) + 10 == want[i]);
     }
-    // Pan key scaling at its extreme byte, the ten notes 10_envelope2 measured: hard right at 12, centre
-    // at 60, hard left from 108 up.
+    // Pan key scaling at its extreme byte, at ten notes measured on the FS1R: hard right at 12, centre at 60, hard left from 108 up.
     {
         const int note[10] = {12, 24, 36, 48, 60, 72, 84, 96, 108, 120};
         const int want[10] = {128, 112, 96, 80, 64, 48, 32, 16, 0, -16};
@@ -163,9 +156,8 @@ int selftest(Synth& S) {
         ck("attack starts at the floor", fabs(e.cur - cal::EG_ATTACK_FLOOR) < 1e-9);
         for (int i = 0; i < (int)(rate_secs(32) * SR); i++) e.tick();
         ck("attack reaches its target", e.cur > -0.5);
-        // A rise to a target part way up takes the same route: the chip aims at the top of the scale and
-        // stops at the target, so it gets there in a fraction of the time an approach aimed at the target
-        // itself would need. Level 70 is 21 dB down; the unit is there inside 80 ms at rate 32.
+        // A rise to a target part way up takes the same route: the chip aims at the top of the scale and stops at the target, so it gets there in a fraction of the time an approach aimed at the target itself would need.
+        // Level 70 is 21 dB down; the FS1R is there inside 80 ms at rate 32.
         int M[4] = {LEVTAB[70] >> 1, 0, 0, 63};
         EG m; m.start(M, R, 0, 0);
         int n = 0;
@@ -212,18 +204,18 @@ int selftest(Synth& S) {
     S.perf.part[0].p[4] = 0; S.forceChannel = 0;
     S.midi_in(0xB0, 101, 0); S.midi_in(0xB0, 100, 0); S.midi_in(0xB0, 6, 12);
     ck("RPN bend range", S.perf.part[0].p[0x26] == 0x4C && S.perf.part[0].p[0x27] == 0x34);
-    // Pitch bend (0x15B80): the bend word is (msb - 64) * 16 + (lsb >> 3), the pitch takes it >> 3, 256 steps,
-    // and source PB gets the same >> 3 raw, -128..127. Ours: bend14 puts the LSB's low six bits between those steps.
+    // Pitch bend: the bend word is (msb - 64) * 16 + (lsb >> 3), the pitch takes it >> 3, 256 steps, and source PB gets the same >> 3 raw, -128..127.
+    // Ours: bend14 puts the LSB's low six bits between those steps.
     { Part& pt = S.perf.part[0];
       auto bw = [&](int lsb, int msb) { S.midi_in(0xE0, lsb, msb); return S.bend_word(pt, 0); };
       S.bend14 = false;
       const double w0 = bw(0, 96), w1 = bw(64, 96);
-      ck("bend: the unit's pitch keeps the LSB's top bit", w0 == 512 && w1 == 520 && bw(63, 96) == w0);
+      ck("bend: the FS1R's pitch keeps the LSB's top bit", w0 == 512 && w1 == 520 && bw(63, 96) == w0);
       bw(0, 0); const int lo = pt.src[S.SRC_PB]; bw(127, 127); const int hi = pt.src[S.SRC_PB]; bw(64, 64);
       ck("bend: source PB spans -128..127, the LSB's top bit included", lo == -128 && hi == 127 && pt.src[S.SRC_PB] == 1);
       S.bend14 = true;
-      ck("bend: an LSB whose low six bits are 0 is the unit's word", bw(0, 96) == w0 && bw(64, 96) == w1);
-      ck("bend: 32 lands halfway between two of the unit's steps", bw(32, 96) == (w0 + w1) / 2);
+      ck("bend: an LSB whose low six bits are 0 is the FS1R's word", bw(0, 96) == w0 && bw(64, 96) == w1);
+      ck("bend: 32 lands halfway between two of the FS1R's steps", bw(32, 96) == (w0 + w1) / 2);
       bool up = true; double last = -1e9;
       for (int v = 0; v < 16384; v += 37) { double w = bw(v & 127, v >> 7); up = up && w >= last; last = w; }
       ck("bend: the 14-bit sweep never steps back", up);
@@ -251,8 +243,8 @@ int selftest(Synth& S) {
       ck("Rcv Max: a bend on channel 2 moves its own note and leaves channel 1's", at60 > 0 && pitchOf(60) == at60 && pitchOf(64) > at64);
       S.midi_in(0xE1, 0, 64); S.all_off();
       init_perf(S.perf); S.forceChannel = force; S.sys[9] = (uint8_t)perfCh; }
-    // A part turned off with a key down: its bank to off, or its Rcv Ch to off, stops what it holds, since the
-    // key up will not reach it. The firmware silences a part whenever its receive changes (FUN_00020644).
+    // A part turned off with a key down: its bank to off, or its Rcv Ch to off, stops what it holds, since the key up will not reach it.
+    // The FS1R silences a part whenever its receive changes.
     { const int force = S.forceChannel; S.forceChannel = -1;
       std::vector<float> l(2048), r(2048);
       for (int al : {0x01, 0x04}) {
@@ -277,16 +269,16 @@ int selftest(Synth& S) {
     S.midi_in(0xB0, 126, 0); ck("mono mode", S.perf.part[0].p[5] == 0);
     S.midi_in(0xB0, 127, 0); ck("poly mode", S.perf.part[0].p[5] == 1);
 
-    // 5. the controller matrix (FUN_00016F9C / F58 / 17032 and the source order in FUN_000191C0)
-    ck("scaler f9c centre", Synth::scale_f9c(0, 0) == 0);
-    ck("scaler f9c full", Synth::scale_f9c(127, 63) == 127);          // (128 * 64 * 2) >> 6 saturates
-    ck("scaler f9c half", Synth::scale_f9c(64, 16) == 34);            // (65 * 17 * 2) >> 6
-    ck("scaler f9c negative", Synth::scale_f9c(-128, 63) == -128);
-    ck("scaler f9c inverted", Synth::scale_f9c(64, -16) == -33);      // a negative depth takes no bias
-    ck("scaler f58 adds to the byte", Synth::scale_f58(64, 16, 64) == 64 + 17);
-    ck("scaler f58 clamps low", Synth::scale_f58(-128, 63, 10) == 0);
-    ck("scaler f58 clamps high", Synth::scale_f58(127, 63, 100) == 127);
-    ck("scaler 17032 is f58 doubled less one", Synth::scale_f032(64, 16, 0) == 33);
+    // 5. the controller matrix and its source order
+    ck("offset scaler centre", Synth::ctrl_scale_offset(0, 0) == 0);
+    ck("offset scaler full", Synth::ctrl_scale_offset(127, 63) == 127);          // (128 * 64 * 2) >> 6 saturates
+    ck("offset scaler half", Synth::ctrl_scale_offset(64, 16) == 34);            // (65 * 17 * 2) >> 6
+    ck("offset scaler negative", Synth::ctrl_scale_offset(-128, 63) == -128);
+    ck("offset scaler inverted", Synth::ctrl_scale_offset(64, -16) == -33);      // a negative depth takes no bias
+    ck("byte scaler adds to the byte", Synth::ctrl_scale_byte(64, 16, 64) == 64 + 17);
+    ck("byte scaler clamps low", Synth::ctrl_scale_byte(-128, 63, 10) == 0);
+    ck("byte scaler clamps high", Synth::ctrl_scale_byte(127, 63, 100) == 127);
+    ck("wide scaler is the byte scaler doubled less one", Synth::ctrl_scale_wide(64, 16, 0) == 33);
     {
         Synth& T = S;
         memset(T.perf.c + 0x28, 0, 0x28);
@@ -305,7 +297,7 @@ int selftest(Synth& S) {
         T.set_source(T.perf.part[0], Synth::SRC_MW, 100);
         ck("the wheel keeps its raw value", T.perf.part[0].src[Synth::SRC_MW] == 100);
         T.set_source(T.perf.part[0], Synth::SRC_KN1, 127);
-        ck("offset follows the source", T.ctrl_offset(0, 37) == Synth::scale_f9c(127, 32));
+        ck("offset follows the source", T.ctrl_offset(0, 37) == Synth::ctrl_scale_offset(127, 32));
         ck("another destination stays clear", T.ctrl_offset(0, 38) == 0);
         T.perf.c[0x28] = 0x0E;                                        // part 1 switched out of the set
         ck("the part switch gates it", T.ctrl_offset(0, 37) == 0);
@@ -313,35 +305,31 @@ int selftest(Synth& S) {
         ck("a global destination ignores the part switch", T.ctrl_offset(0, 46) != 0);
         T.perf.c[0x28] = 0x0F; T.perf.c[0x40] = 21;                   // filter cutoff edits the part byte
         ck("a part-byte destination lands on the byte",
-           T.ctrl_part(0, 21, 64) == Synth::scale_f58(127, 32, 64));
-        // ctrlDest_21 writes the cutoff byte itself, from a copy of the byte (Part::ctlBase) plus the controller,
-        // so the byte reads as the unit's edit buffer does, the same source again does not compound, and an
-        // ordinary edit (CC74 here, FUN_00030796's normal path) moves the base the controller adds to.
+           T.ctrl_part(0, 21, 64) == Synth::ctrl_scale_byte(127, 32, 64));
+        // Destination 21 writes the cutoff byte itself, from a copy of the byte (Part::ctlBase) plus the controller, so the byte reads as the FS1R's edit buffer does, the same source again does not compound, and an ordinary edit (CC74 here) moves the base the controller adds to.
         { Part& pt = T.perf.part[0];
           pt.p[0x18] = 50; pt.fill_ctl_base();
           T.set_source(pt, Synth::SRC_KN1, 127);
           const int up = pt.p[0x18];
           T.set_source(pt, Synth::SRC_KN1, 127);
-          ck("a controller writes the cutoff byte as base plus offset, once", up == Synth::scale_f58(127, 32, 50) && pt.p[0x18] == up && pt.ctlBase[4] == 50);
+          ck("a controller writes the cutoff byte as base plus offset, once", up == Synth::ctrl_scale_byte(127, 32, 50) && pt.p[0x18] == up && pt.ctlBase[4] == 50);
           T.set_source(pt, Synth::SRC_KN1, 64);
           ck("and the byte is back at its base when the source rests", pt.p[0x18] == 50);
           T.control_change(0, 74, 30);
           T.set_source(pt, Synth::SRC_KN1, 127);
-          ck("an edit moves the base the controller adds to", pt.ctlBase[4] == 30 && pt.p[0x18] == Synth::scale_f58(127, 32, 30)); }
-        // Two sets on one destination do not compose: each handler stores a per-part byte, so the
-        // highest-numbered one wins (FUN_00014DDC walks 0 to 7, ctrlDest_37 writes DAT_01029758).
+          ck("an edit moves the base the controller adds to", pt.ctlBase[4] == 30 && pt.p[0x18] == Synth::ctrl_scale_byte(127, 32, 30)); }
+        // Two sets on one destination do not compose. Each handler stores a per-part byte and the sets run 0 to 7, so the highest-numbered one wins.
         T.perf.c[0x40] = 37; T.perf.c[0x29] = 0x0F;
         T.perf.c[0x32] = 0; T.perf.c[0x33] = 1 << Synth::SRC_KN1;
         T.perf.c[0x41] = 37; T.perf.c[0x49] = 64 + 16;                // set 2, same destination, depth +16
-        ck("the higher set wins, it does not sum", T.ctrl_offset(0, 37) == Synth::scale_f9c(127, 16));
-        // Frequency bias reaches formant and fixed operators only: the ratio branch of FUN_0001E838
-        // adds nothing, which is what detuned the demo's ratio operators under a moving controller.
+        ck("the higher set wins, it does not sum", T.ctrl_offset(0, 37) == Synth::ctrl_scale_offset(127, 16));
+        // Frequency bias reaches formant and fixed operators only; the ratio branch adds nothing, which is what detuned the demo's ratio operators under a moving controller.
         T.perf.c[0x41] = 36; T.perf.c[0x49] = 64 + 16;                // set 2 -> frequency bias
         T.perf.c[0x40] = 0;
         Voice& V = T.perf.part[0].voice;
         V.v[0].form = 7; V.v[0].fbias = 7 + 4; V.v[1].form = 0; V.v[1].fixed = 0; V.v[1].fbias = 7 + 4;
         T.refresh_bias(T.ch[0], T.perf.part[0]);
-        int want = (int16_t)(Synth::scale_f9c(127, 16) * 4 * 0x10) >> 2;
+        int want = (int16_t)(Synth::ctrl_scale_offset(127, 16) * 4 * 0x10) >> 2;
         ck("the formant operator takes the frequency bias", T.ch[0].fbW[0] == want && want != 0);
         ck("the ratio operator does not", T.ch[0].fbW[1] == 0);
         memset(T.perf.c + 0x28, 0, 0x28);
@@ -355,14 +343,14 @@ int selftest(Synth& S) {
         T.perf.c[0x40] = 15;                                          // to the insertion's send to the reverb
         T.perf.c[0x48] = 64 + 32;
         T.set_source(T.perf.part[0], Synth::SRC_KN1, 127);
-        ck("an effect destination follows its source", T.fx.host.sendReverbOffset == Synth::scale_f9c(127, 32));
+        ck("an effect destination follows its source", T.fx.host.sendReverbOffset == Synth::ctrl_scale_offset(127, 32));
         T.control_change(0, 121, 0);
         ck("and a controller reset", T.fx.host.sendReverbOffset == 0);
         memset(T.perf.c + 0x28, 0, 0x28);
     }
 
-    // 5b. the detune law: the ROM's own key scaled table, against what 11_detune measured. The band is
-    // (pitchNote >> 8) + 10 - 0x50, which advances four per octave, so note 60 is band 13.
+    // 5b. the detune law: the ROM's own key scaled table, against detune measured on the FS1R.
+    // The band is (pitchNote >> 8) + 10 - 0x50, which advances four per octave, so note 60 is band 13.
     {
         auto detw = [](int byte, int band) {
             int dd = byte < 15 ? (~byte) : byte - 15, idx = (dd & 0x1F) * 32 + band;
@@ -405,18 +393,16 @@ int selftest(Synth& S) {
            down.word == centred.word - want && down.inc == op_increment(centred.word - want));
         init_default_voice(V);
     }
-    // A part's detune scales by the key played (FUN_00010dc4 reads the band off 0x0102A402, before any note
-    // shift), so a part two octaves down at -18 on key 60 moves 18 * (15 - 7) / 15 = 9 words, not the 13 its
-    // shifted note's band would give. Teck Hook's layers beat at the unit's 2.1 and 3.2 Hz only so.
+    // A part's detune scales by the key played, its band read before any note shift, so a part two octaves down at -18 on key 60 moves 18 * (15 - 7) / 15 = 9 words, not the 13 its shifted note's band would give.
+    // Teck Hook's layers beat at the FS1R's 2.1 and 3.2 Hz only so.
     { Part& pt = S.perf.part[0]; const uint8_t ns = pt.p[8], dt = pt.p[9]; Chan C{};
       pt.p[8] = 0;   // note shift -24
       pt.p[9] = 0x40; S.compute_pitch(C, pt, 60); const int centre = C.pitchNote;
       pt.p[9] = 0x40 - 18; S.compute_pitch(C, pt, 60); const int down = C.pitchNote;
       pt.p[8] = ns; pt.p[9] = dt;
       ck("a part's detune scales by the key played, not the shifted note", centre - down == 9); }
-    // A fine of 100 or more plays as the next coarse step at fine 0, as measured on the unit on 2026-10-23:
-    // coarse 0 fine 100 is ratio 1.0 and coarse 2 fine 100 is 3.0. The factory Hook under Teck Hook, Tech Lead
-    // and 25 more store fine 100; held at 99 they sat 8 cents under the note and beat against it.
+    // A fine of 100 or more plays as the next coarse step at fine 0, as measured on the FS1R; coarse 0 fine 100 is ratio 1.0 and coarse 2 fine 100 is 3.0.
+    // The factory Hook under Teck Hook, Tech Lead and 25 more store fine 100; held at 99 they sat 8 cents under the note and beat against it.
     { Synth& T = S; Voice& V = T.perf.part[0].voice;
       auto word = [&](int coarse, int fine) {
           init_default_voice(V);
@@ -432,16 +418,13 @@ int selftest(Synth& S) {
       init_default_voice(V);
       ck("a fine of 100 or more plays as the next coarse step", carry); }
 
-    // FS1R.unlock 2026-10-26-open, measured on rgwan's unit. An OP Att edit reaches a modulator until the algorithm
-    // changes (FUN_00032624 skips FUN_0003251C's carrier test); a key-sync-off operator on a mono part starts each
-    // note where its generator ran on to, on the channel the part takes back; a performance load starts portamento
-    // from 0x53AA; and a modulated formant grain keeps reading its window past the window's end.
+    // Measured on the FS1R: an OP Att edit reaches a modulator until the algorithm changes (the edit skips the carrier test); a key-sync-off operator on a mono part starts each note where its generator ran on to, on the channel the part takes back; a performance load starts portamento from 0x53AA; and a modulated formant grain keeps reading its window past the window's end.
     { auto A = std::make_unique<Synth>(); Synth& T = *A; Voice& V = T.perf.part[0].voice; init_default_voice(V);
       auto param = [&](int al, int v) { const uint8_t m[10] = {0xF0, 0x43, 0x10, 0x5E, 0x40, 0x00, (uint8_t)al, 0, (uint8_t)v, 0xF7}; apply_param_change_locked(T, m, 10); };
       param(0x2C, 7);                                   // algorithm 8: op 1 modulates op 2
       param(0x2D, 15);
       const bool edited = V.corrEdit == 1;
-      param(0x2C, 7);                                   // the same algorithm again keeps the edit (take 5)
+      param(0x2C, 7);                                   // the same algorithm again keeps the edit
       const bool kept = V.corrEdit == 1;
       param(0x2C, 0); param(0x2C, 7);
       ck("engine: an OP Att edit reaches a modulator until the algorithm changes", edited && kept && V.corrEdit == 0); }
@@ -457,8 +440,7 @@ int selftest(Synth& S) {
       int again = -1; for (int i = 0; i < NCHAN; i++) if (T.ch[i].active && T.ch[i].held) again = i;
       ck("engine: a mono part's key-sync-off operator runs on through the gap", again == at && T.ch[at].op[0].phase == ph + inc * 4800u);
       T.midi_in(0x80, 60, 0); }
-    // #101: staccato on a long release. Poly lets each release ring on its own channel; mono takes the one
-    // channel back (FUN_000112c0), so its releases never stack.
+    // #101: staccato on a long release. Poly lets each release ring on its own channel; mono takes the one channel back, so its releases never stack.
     for (int mono = 0; mono < 2; mono++) {
       auto A = std::make_unique<Synth>(); Synth& T = *A; Voice& V = T.perf.part[0].voice; init_default_voice(V);
       for (auto& o : V.v) o.T[3] = 99;                  // longest release
@@ -479,9 +461,7 @@ int selftest(Synth& S) {
           for (int n = 0; n < 150; n++) y = op_sample(s, v, 480.0, 0.0, 0, 0, pm, 1.0); return y; };
       ck("engine: a modulated formant grain reads on past its window, an unmodulated one ends", run(0.25) != 0.0 && run(0.0) == 0.0); }
 
-    // A frame replaces an operator's centre and nothing else: LFO freq mod (FUN_0001DC30) and, on the noise half, the
-    // control sets' frequency offset (FUN_0002E308) move it as they move a fixed operator. Note scaling and freq
-    // velocity sense do not (FUN_000135D8, FUN_0001386A).
+    // A frame replaces an operator's centre and nothing else: LFO freq mod and, on the noise half, the control sets' frequency offset move it as they move a fixed operator. Note scaling and freq velocity sense do not.
     {
         auto A = std::make_unique<Synth>(); Synth& T = *A;
         Voice& V = T.perf.part[0].voice;
@@ -521,7 +501,7 @@ int selftest(Synth& S) {
         Op1 fixed5 = lfo(false, 5), fseq5 = lfo(true, 5), fseq7 = lfo(true, 7), fseq0 = lfo(true, 0);
         ck("an Fseq operator takes LFO freq mod as a fixed one does",
            fixed5.word > 0 && fabs(fseq5.word - fixed5.word) < 1e-9 && fseq7.word > fseq5.word && fseq0.word == 0);
-        // The unit swings FMS 5 by 96/256 of FMS 7 (cal.h FMS_FRAC, measured 2026-11-17), not 5/7.
+        // The FS1R swings FMS 5 by 96/256 of FMS 7 (cal.h FMS_FRAC), not 5/7.
         ck("FMS 5 swings 96/256 of FMS 7", fabs(fixed5.word / lfo(false, 7).word - 96 / 256.0) < 0.005);
         // Noise is read in cents off two centres (a frame word is even, the fixed one odd), and the phase generator's
         // steps differ by a fraction of a cent between them.
@@ -534,7 +514,7 @@ int selftest(Synth& S) {
         ck("velocity moves a fixed operator and leaves an Fseq one", moves(false, 60, 20, 60, 127) && !moves(true, 60, 20, 60, 127));
     }
 
-    // Formant transpose is the pitch half of register 0x230 (FUN_00013bc6): it shifts the grain rate.
+    // Formant transpose is the pitch half of register 0x230, so it shifts the grain rate.
     // The formant frequency, coarse and fine plus detune, stays. A frame replaces that frequency and
     // leaves the pitch word, so an Fseq formant is transposed the same way. Sine ignores it.
     {
@@ -674,7 +654,7 @@ int selftest(Synth& S) {
       auto A = std::make_unique<Synth>(), B = std::make_unique<Synth>(), C = std::make_unique<Synth>();
       open(*A); open(*B); open(*C);
       B->perf.part[0].p[7] = 1; C->perf.part[0].p[7] = 1;
-      C->filter32 = false;                                 // the unit's split, which the next checks are about
+      C->filter32 = false;                                 // the FS1R's split, which the next checks are about
       note(*A, 0, 96, l0, r0);                             // no filter anywhere
       note(*B, 0, 96, l1, r1);                             // the same note with part 1's filter on, cutoff 40
       int at = -1; for (int i = 0; i < NCHAN; i++) if (B->ch[i].active) at = i;
@@ -686,10 +666,10 @@ int selftest(Synth& S) {
       at = -1; for (int i = 0; i < NCHAN; i++) if (C->ch[i].active) at = i;
       ck("engine: a part without a filter plays on the other channels", at >= 16);
       ck("engine: and sounds exactly as it does with no filter anywhere", l2 == l0 && r2 == r0 && energy(l0) > 0);
-      // a switch that changes stops every channel, as on the unit
+      // a switch that changes stops every channel, as on the FS1R
       C->perf.part[1].p[7] = 1; C->render(l2.data(), r2.data(), 16);
       ck("engine: changing a filter switch stops every note", C->active_chans() == 0);
-      // Ours: two filter chips, so a filtered part plays 32 voices, filtered on both; the unit's 16 with filter32 off.
+      // Ours: two filter chips, so a filtered part plays 32 voices, filtered on both; the FS1R's 16 with filter32 off.
       for (int wide = 0; wide < 2; wide++) {
           auto E = std::make_unique<Synth>(); open(*E); E->perf.part[0].p[7] = 1; E->perf.part[0].p[0] = 32; E->filter32 = wide;
           for (int n = 0; n < 32; n++) E->note_on(0, 40 + n, 100);
@@ -697,11 +677,9 @@ int selftest(Synth& S) {
           int busy = 0, onChip1 = 0; for (int s = 0; s < 16; s++) onChip1 += E->flt.bank[1].host.slotPart[s] == 0;
           for (auto& c : E->ch) busy += c.active && c.filtered;
           if (wide) ck("engine: 32 filtered voices, the second sixteen on bank 1", busy == 32 && onChip1 == 16 && energy(l) > 0);
-          else ck("engine: 16 filtered voices, the unit's", busy == 16 && onChip1 == 0);
+          else ck("engine: 16 filtered voices, the FS1R's", busy == 16 && onChip1 == 0);
       }
-      // Ours (docs/Differences.md, more than 32 voices): a polyphony of 64 or 128 fills as the unit's 32 does, channels
-      // 1..n-1 then 0 with every one sounding; the next note steals what the unit's rule picks, channel 2 and the
-      // second note played; a change of polyphony stops every note and the next lands on channel 1 again.
+      // Ours (docs/Differences.md, more than 32 voices): a polyphony of 64 or 128 fills as the FS1R's 32 does, channels 1..n-1 then 0 with every one sounding; the next note steals what the FS1R's rule picks, channel 2 and the second note played; a change of polyphony stops every note and the next lands on channel 1 again.
       auto sine = [](Synth& T) {
           Voice& V = T.perf.part[0].voice;
           V.v[0].form = 0; V.v[0].level = 99; V.v[0].fixed = 0; V.v[0].coarse = 1; V.v[0].keysync = 1;
@@ -727,8 +705,7 @@ int selftest(Synth& S) {
           E->midi_in(0x90, 60, 100); E->render(l, r, 4);
           ck("engine: and the next note lands on channel 1 again", E->ch[1].active && E->ch[1].note == 60);
       }
-      // With filter on every voice, channel n has slot n & 15 of bank n >> 4, eight banks at 128; without, the
-      // unit's split: a filtered part on the chip's sixteen, an unfiltered one on the other 112.
+      // With filter on every voice, channel n has slot n & 15 of bank n >> 4, eight banks at 128; without, the FS1R's split, a filtered part on the chip's sixteen and an unfiltered one on the other 112.
       {
           auto F = std::make_unique<Synth>(); open(*F); F->perf.part[0].p[7] = 1; F->perf.part[0].p[0] = 32; F->poly = 128;
           float l[8], r[8]; F->render(l, r, 4);
@@ -743,7 +720,7 @@ int selftest(Synth& S) {
           for (int k = 0; k < 112; k++) G->note_on(1, k, 100);
           int lo = 0, hi = 0, p0 = 0, p1 = 0;
           for (int i = 0; i < 128; i++) { const Chan& c = G->ch[i]; if (!Synth::owned(c)) continue; (c.part ? p1 : p0)++; (i < 16 ? lo : hi)++; }
-          ck("engine: the unit's split at 128: sixteen filtered channels, the other 112 unfiltered", p0 == 16 && lo == 16 && p1 == 112 && hi == 112 && G->flt_banks() == 1);
+          ck("engine: the FS1R's split at 128: sixteen filtered channels, the other 112 unfiltered", p0 == 16 && lo == 16 && p1 == 112 && hi == 112 && G->flt_banks() == 1);
       }
       // The reserves scale: at 128 a reserve of 8 is 32 and 24 is 96. Part 1 holding 34 is over its 32, part 2 holding
       // 94 is under its 96, so part 2's next note takes a channel from part 1; by the bytes alone part 2 would be the
@@ -771,18 +748,17 @@ int selftest(Synth& S) {
           phrase(*A, la, ra); phrase(*B, lb, rb);
           ck("engine: sixteen notes render the same bits at 32 and at 128 voices", la == lb && ra == rb && energy(la) > 0);
       }
-      // Ours (FSVR#56): a controller on cutoff glides rather than stepping. The unit writes the new word
-      // straight into the filter (FUN_0000C36C). Cutoff 40 to 100 mid-note: 1 ms after the jump the glide
-      // has let through under half of what the open filter passes 30 ms on; the unit's step lets through all.
+      // Ours (FSVR#56): a controller on cutoff glides rather than stepping, where the FS1R writes the new word straight into the filter.
+      // Cutoff 40 to 100 mid-note: 1 ms after the jump the glide has let through under half of what the open filter passes 30 ms on; the FS1R's step lets through all.
       for (int glide = 0; glide < 2; glide++) {
           auto G = std::make_unique<Synth>(); open(*G); G->perf.part[0].p[7] = 1; G->cutoffGlide = glide;
           std::vector<float> l(4800), r(4800); note(*G, 0, 96, l, r);
-          G->perf.part[0].p[0x18] = 100;                   // what ctrlDest_21 writes
+          G->perf.part[0].p[0x18] = 100;                   // what the cutoff destination writes
           std::vector<float> a(48), ar(48), b(48), br(48), skip(1440), sr(1440);
           G->render(a.data(), ar.data(), 48); G->render(skip.data(), sr.data(), 1440); G->render(b.data(), br.data(), 48);
           const double ratio = energy(a) / energy(b);
           if (glide) ck("engine: a cutoff change glides (ours)", ratio < 0.5 && energy(b) > 0);
-          else ck("engine: and steps as on the unit with the glide off", ratio > 0.8);
+          else ck("engine: and steps as on the FS1R with the glide off", ratio > 0.8);
       } }
 
     // Note and velocity limits: low above high plays everything but the gap between them, as Drum Kit 9o9's
@@ -805,10 +781,8 @@ int selftest(Synth& S) {
     // A part whose voice bank is off receives nothing even with a receive channel (A011 Sho, parts 3 and 4).
     { S.perf.part[1].p[1] = 0; S.perf.part[1].p[4] = 0x10; ck("bank off silences the part", !S.part_listens(1, 0)); S.perf.part[1].p[1] = 2; ck("bank on hears it again", S.part_listens(1, 0)); }
 
-    // DX7 conversion against the firmware's own: demo song 10 sends the unit's conversion of PrC voice 371
-    // (DX-Acrd 4), edited afterwards on a few musical bytes. Every byte the demo left alone must match:
-    // the common block outside LFO/PEG/category, the two unused operator slots, and on each used slot the
-    // placement (byte 5), fixed/coarse/fine where unedited, detune, hold, time scaling and the sense bytes.
+    // DX7 conversion against the FS1R's own: demo song 10 sends the FS1R's conversion of PrC voice 371 (DX-Acrd 4), edited afterwards on a few musical bytes.
+    // Every byte the demo left alone must match: the common block outside LFO/PEG/category, the two unused operator slots, and on each used slot the placement (byte 5), fixed/coarse/fine where unedited, detune, hold, time scaling and the sense bytes.
     { static const uint8_t demo[608] = {
     0x44, 0x58, 0x2D, 0x41, 0x63, 0x72, 0x64, 0x20, 0x34, 0x20, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x04, 0x13, 0x26, 0x00, 0x00, 0x03, 0x00, 0x00, 0x04, 0x13, 0x00, 0x00, 0x00, 0x00, 0x24, 0x32,
     0x2F, 0x32, 0x32, 0x00, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0x32, 0x00,
@@ -839,7 +813,7 @@ int selftest(Synth& S) {
       };
       uint8_t out[608]; convert_dx7(vced, nullptr, out); int bad = 0;
       for (int i = 0; i < 608; i++) if (i != 0x0E && out[i] != demo[i]) bad++;   // 0x0E is the category, the demo's one edit
-      ck("DX7 conversion matches the unit's own DX-Acrd 4 bulk on every byte but the category", bad == 0); }
+      ck("DX7 conversion matches the FS1R's own DX-Acrd 4 bulk on every byte but the category", bad == 0); }
 
     // DX7 conversion: the operator slot is DX7MAP word 25 + j, and every DX carrier lands on an FS1R carrier
     { uint8_t vced[155] = {}; vced[134] = 4;                        // DX algorithm 5: carriers 1, 3, 5
@@ -850,8 +824,8 @@ int selftest(Synth& S) {
           bool carrier = alg[2 * o + 1] & 1, want = (6 - j) == 1 || (6 - j) == 3 || (6 - j) == 5; if (carrier != want) ok = false; }
       ck("DX7 alg 5 carriers land on FS1R carriers (B025 Tremolo)", ok); }
 
-    // The ACED's amp mod sense (0..7) replaces the VCED's (0..3) on the operator the DX operator lands on, unless it
-    // is 0, and the EG bias sense follows it (FUN_00035E96). The slot is the algorithm's, not a fixed one.
+    // The ACED's amp mod sense (0..7) replaces the VCED's (0..3) on the operator the DX operator lands on, unless it is 0, and the EG bias sense follows it.
+    // The slot is the algorithm's, not a fixed one.
     { uint8_t vced[155] = {}; vced[134] = 4;
       for (int j = 0; j < 6; j++) { vced[j * 21 + 20] = (uint8_t)(1 + j); vced[j * 21 + 14] = 2; }   // detune tags the operator, ams 2
       uint8_t plain[608]; convert_dx7(vced, nullptr, plain);
@@ -880,9 +854,8 @@ int selftest(Synth& S) {
       load_sysex(*A, nullptr, vced.data(), vced.size(), 0, 0);
       ck("an ACED sent to one engine reaches its own next VCED and not another engine's", op6ams(*A) == 7 && op6ams(*B) == 2); }
 
-    // A read leaves the sum bus as it is and t1 bit 1 starts it over (docs/ymp706_registers.md, the algorithm word).
-    // The table bears that out on all 88: the bit never falls while an add waits for its reader, and every entry
-    // that adds to the bus sets it at or before its first add.
+    // A read leaves the sum bus as it is and t1 bit 1 of the algorithm word starts it over.
+    // The table bears that out on all 88: the bit never falls while an add waits for its reader, and every entry that adds to the bus sets it at or before its first add.
     { bool drops = false, late = false;
       for (int a = 0; a < 88; a++) {
           bool waiting = false, cleared = false;
@@ -939,10 +912,8 @@ int selftest(Synth& S) {
       int w1 = -1; for (auto& c : S.ch) if (c.active && c.part == 0) w1 = c.freqWord[0];
       ck("voice edit reaches the sounding note", w0 >= 0 && w1 == w0 + 1024); S.all_off(); }
 
-    // The operator frequency EG is a linear ramp at a rate the amplitude EG's own ladder sets, and the
-    // slope does not depend on the swing: that is what 07_modulation_2 measured and what separates it
-    // from the exponential approach the engine used to have. Two swings at one attack time, the larger
-    // taking proportionally longer, is the smallest thing that fails if the shape goes back.
+    // The operator frequency EG is a linear ramp at a rate the amplitude EG's own ladder sets, and the slope does not depend on the swing, as measured on the FS1R; that is what separates it from the exponential approach the engine used to have.
+    // Two swings at one attack time, the larger taking proportionally longer, is the smallest thing that fails if the shape goes back.
     { init_perf(S.perf); Voice& V = S.perf.part[0].voice;
       S.perf.part[0].p[1] = 2; S.perf.part[0].p[4] = 0x10;
       auto ramp_ticks = [&](int init) {
@@ -977,10 +948,8 @@ int selftest(Synth& S) {
          n25 > 0 && fabs(s25 / n25 - want) < want * 0.01);
       S.all_off(); init_perf(S.perf); }
 
-    // A fixed operator takes its frequency EG too: A123 Drum Kit 3's kick sweeps on the unit, and rgwan's rig
-    // tracked fixed 1 kHz sines along this ramp to 1% (docs/findings.md 2026-10-25). A fixed 220 Hz carrier at
-    // init +25 has to advance its phase feg_semis(25) above its own step on the first sample. Read off the
-    // operator's phase, not the mix, which carries the random note phase and pan.
+    // A fixed operator takes its frequency EG too: A123 Drum Kit 3's kick sweeps on the FS1R, and fixed 1 kHz sines measured on it follow this ramp to 1%.
+    // A fixed 220 Hz carrier at init +25 has to advance its phase feg_semis(25) above its own step on the first sample. Read off the operator's phase, not the mix, which carries the random note phase and pan.
     { init_perf(S.perf); Part& pt = S.perf.part[0]; Voice& V = pt.voice; pt.p[1] = 2; pt.p[4] = 0x10;
       init_blank_voice(V.raw); uint8_t* op = V.raw + 112;
       op[1] = 15; op[2] = 0; op[5] |= 0x40; op[22] = 99;
@@ -994,10 +963,8 @@ int selftest(Synth& S) {
       ck("a fixed operator's frequency EG moves its pitch (A123's kick)", c && fabs(1200 * log2(step / want)) < 30);
       S.all_off(); init_perf(S.perf); }
 
-    // A note-on that takes a channel from a sounding note damps it rather than zeroing it
-    // (FUN_00023000: EG stage word to 4 and register 0xFC/FD, the mask out of the one-hot table at
-    // 0x35B260). Fill every channel with a sounding note, strike one more, and the displaced channel's
-    // own output must carry on into the next sample instead of dropping to zero.
+    // A note-on that takes a channel from a sounding note damps it rather than zeroing it (its EG stage word to 4 and a one-hot channel mask to register 0xFC/FD).
+    // Fill every channel with a sounding note, strike one more, and the displaced channel's own output must carry on into the next sample instead of dropping to zero.
     { init_perf(S.perf); Voice& V = S.perf.part[0].voice;
       S.perf.part[0].p[1] = 2; S.perf.part[0].p[4] = 0x10;
       V.v[0].form = 0; V.v[0].level = 99; V.v[0].fixed = 0; V.v[0].coarse = 1; V.v[0].keysync = 1;
@@ -1027,9 +994,8 @@ int selftest(Synth& S) {
       }
       S.all_off(); init_perf(S.perf); }
 
-    // After a note the output is digital zero again, as the unit's is (FS1R.unlock 2026-10-26-*-silence): the
-    // effect section's double residue left the DAC on -1 step for good. And the random note phase and pan are the
-    // instance's own: two instances seeded alike render alike, whatever a third draws in between.
+    // After a note the output is digital zero again, as the FS1R's is; the effect section's double residue left the DAC on -1 step for good.
+    // And the random note phase and pan are the instance's own: two instances seeded alike render alike, whatever a third draws in between.
     { auto play = [](uint32_t seed, Synth* other, std::vector<float>& l) {
           auto T = std::make_unique<Synth>(); init_perf(T->perf); init_default_voice(T->perf.part[0].voice);
           T->perf.part[0].p[1] = 2; T->perf.part[0].p[4] = 0x10; T->perf.part[0].p[0x0E] = 0;   // pan 0: random per note
@@ -1050,9 +1016,8 @@ int selftest(Synth& S) {
       }
       ck("silence: the output is exactly zero again after a note", zero); }
 
-    // The chip's operator cut (cal::OP_CUT_DB, NOISE_CUT_DB), at the four points rgwan's unit put either side of
-    // it on 2026-10-26: one sine carrier at output level 4 (register 235) sounds and at 3 (243) is exactly zero; the
-    // noise at level 2 (251) sounds and at 1 (255) is exactly zero. Velocity 127, sensitivity 0, every other op off.
+    // The chip's operator cut (cal::OP_CUT_DB, NOISE_CUT_DB), at four points measured either side of it on the FS1R: one sine carrier at output level 4 (register 235) sounds and at 3 (243) is exactly zero; the noise at level 2 (251) sounds and at 1 (255) is exactly zero.
+    // Velocity 127, sensitivity 0, every other op off.
     { auto peak = [](int level, bool noise) {
           auto T = std::make_unique<Synth>(); init_perf(T->perf); Part& pt = T->perf.part[0]; Voice& V = pt.voice;
           pt.p[1] = 2; pt.p[4] = 0x10;
@@ -1117,11 +1082,9 @@ int selftest(Synth& S) {
       ck("phase: and nothing without key sync", c == d);
       ck("phase: refresh_regs carries an edit to a sounding note", a[0] == 0.25 && b[0] == 0.25); }
 
-    // Key sync holds the operators' relation at every note: two key-synced operators at 1:1 agree half a second
-    // on at C2 to C5. A frequency EG on one of them alone is a sweep only it makes, and leaves it ahead by a share
-    // of a turn that doubles each octave, which is what the 2026-10-17 report on Bassline 2 (Freq EG Init 30 on
-    // operator 7) heard (docs/findings.md). An EG hold is left out: the operator's phase and frequency EG wait
-    // through it, and whether the unit's do is not measured.
+    // Key sync holds the operators' relation at every note: two key-synced operators at 1:1 agree half a second on at C2 to C5.
+    // A frequency EG on one of them alone is a sweep only it makes, and leaves it ahead by a share of a turn that doubles each octave, which is what is heard on Bassline 2 (Freq EG Init 30 on operator 7).
+    // An EG hold is left out: the operator's phase and frequency EG wait through it, and whether the FS1R's do is not measured.
     { auto lead = [](int note, int feg) {
           auto T = std::make_unique<Synth>(); init_perf(T->perf); Part& pt = T->perf.part[0]; Voice& V = pt.voice;
           pt.p[1] = 2; pt.p[4] = 0x10;
@@ -1139,9 +1102,8 @@ int selftest(Synth& S) {
       ck("key sync: two operators in step at every note", held);
       ck("key sync: a frequency EG on one alone leads it by a share that doubles each octave", doubles && fabs(fe[0]) > 0.05); }
 
-    // odd and res read their window and carrier by phase with the modulation added to both (US5610354, FIG. 11), so a
-    // fixed operator at 0 Hz shapes whatever modulates it, as the sine does. As grains fired by an accumulator of their
-    // own they passed nothing at 0 Hz: a modulator into odd1 at 0 Hz was silence (reported on the 2026-10-20 nightly).
+    // odd and res read their window and carrier by phase with the modulation added to both (US5610354, FIG. 11), so a fixed operator at 0 Hz shapes whatever modulates it, as the sine does.
+    // As grains fired by an accumulator of their own they passed nothing at 0 Hz, so a modulator into odd1 at 0 Hz was silence.
     { double quiet = 1;
       for (int form : {0, 3, 4, 5, 6}) {
           OpV v{}; v.form = form; v.skirt = 0; OpState s{}; double peak = 0;
@@ -1150,15 +1112,13 @@ int selftest(Synth& S) {
       }
       ck("a 0 Hz operator shapes its modulator on sine, odd1, odd2, res1 and res2", quiet > 0.01); }
 
-    // The phase generator, as measured on the unit (cal.h): the increments take 3 predicted and then read off it,
-    // carriers and modulators, fixed and ratio-mode, every floor-or-round choice a floor; the saturated word's
-    // 23982 Hz line; and a fixed operator at coarse 17, fine 3 stepping by exactly that increment in a channel.
-    { const struct { int w; uint32_t k; } take3[] = {{27909, 156352}, {27949, 160640}, {28181, 187968}, {28245, 196288},
+    // The phase generator, as measured on the FS1R (cal.h): twenty increments, carriers and modulators, fixed and ratio-mode, every floor-or-round choice a floor; the saturated word's 23982 Hz line; and a fixed operator at coarse 17, fine 3 stepping by exactly that increment in a channel.
+    { const struct { int w; uint32_t k; } measured[] = {{27909, 156352}, {27949, 160640}, {28181, 187968}, {28245, 196288},
           {28549, 241152}, {28781, 282112}, {28621, 253248}, {28077, 175232}, {15621, 38}, {15661, 39}, {15893, 45},
           {15957, 47}, {16261, 58}, {16493, 68}, {16333, 61}, {15789, 42}, {24045, 11436}, {26093, 45744},
           {26179, 48480}, {28141, 182976}};
-      bool all = true; for (auto& t : take3) all = all && op_increment(t.w) == t.k;
-      ck("phase generator: take 3's twenty increments", all);
+      bool all = true; for (auto& t : measured) all = all && op_increment(t.w) == t.k;
+      ck("phase generator: twenty measured increments", all);
       ck("phase generator: word 32767 is 4093 << 10, 23982.42 Hz", op_increment(32767) == 4191232u && fabs(op_hz(op_increment(32767)) - 23982.421875) < 1e-9);
       ck("phase generator: the lowest word steps by nothing, the lowest fixed setting by one", op_increment(0) == 0 && op_increment(8 * 0 + 0x28ED) == 1);
       auto T = std::make_unique<Synth>(); init_perf(T->perf); Part& pt = T->perf.part[0]; Voice& V = pt.voice;
@@ -1172,9 +1132,8 @@ int selftest(Synth& S) {
       for (uint32_t n = 90; n <= 100; n++) whole = whole || (c && c->op[0].phase == op_inc32(156352) * n);
       ck("phase generator: a fixed coarse 17 fine 3 steps by exactly 156352", c && c->op[0].inc == 156352u && whole); }
 
-    // A formant's grains fire at a rate off the same phase generator. On the unit a fixed sine and a fixed formant
-    // at coarse 16 fine 0, played at the key whose pitch is that word, hold still against each other (2026-10-24);
-    // the smooth law put the grains at 440.000 Hz under a sine at 440.186.
+    // A formant's grains fire at a rate off the same phase generator.
+    // On the FS1R a fixed sine and a fixed formant at coarse 16 fine 0, played at the key whose pitch is that word, hold still against each other; the smooth law put the grains at 440.000 Hz under a sine at 440.186.
     { auto T = std::make_unique<Synth>(); init_perf(T->perf); Part& pt = T->perf.part[0]; Voice& V = pt.voice;
       pt.p[1] = 2; pt.p[4] = 0x10;
       init_blank_voice(V.raw);
@@ -1186,10 +1145,8 @@ int selftest(Synth& S) {
       ck("phase generator: a fixed formant's grains run at the fixed sine's rate on the same word",
          c && c->op[0].inc == 76928u && c->op[1].fw == c->op[0].fop); }
 
-    // The allocator, against the unit itself (FS1R.unlock captures/2026-09-25-7, session6 alloc).
-    // Filling an empty machine with notes 36..67 on part 1 put them on channels 1..31 then 0, and a
-    // 33rd note of 100 arriving on the full part took channel 2 (which held note 37). Both are
-    // round-robin behaviour the old "lowest free, else oldest" got wrong.
+    // The allocator, against the FS1R itself: filling an empty machine with notes 36..67 on part 1 puts them on channels 1..31 then 0, and a 33rd note of 100 arriving on the full part takes channel 2 (which held note 37).
+    // Both are round-robin behaviour the old "lowest free, else oldest" got wrong.
     { init_perf(S.perf); Voice& V = S.perf.part[0].voice;
       V.v[0].form = 0; V.v[0].level = 99; V.v[0].fixed = 0; V.v[0].coarse = 1; V.v[0].keysync = 1;
       for (int i = 0; i < 4; i++) { V.v[0].L[i] = i == 3 ? 0 : 99; V.v[0].T[i] = i == 3 ? 60 : 0; }
@@ -1205,20 +1162,19 @@ int selftest(Synth& S) {
       bool rr = true;
       for (int i = 0; i < NCHAN; i++) rr = rr && order[i] == (i + 1) % NCHAN;
       ck("allocation is round robin: 32 notes land on channels 1..31 then 0", rr);
-      // the 33rd, above every held note: the unit took channel 2, which held note 37
+      // the 33rd, above every held note: the FS1R takes channel 2, which held note 37
       int before = -1;
       for (int i = 0; i < NCHAN; i++) if (S.ch[i].note == 37) before = i;
       S.midi_in(0x90, 100, 100); S.render(l, r, 4);
       int took = -1;
       for (int i = 0; i < NCHAN; i++) if (S.ch[i].active && S.ch[i].note == 100) took = i;
-      ck("the 33rd note steals the channel the unit stole (ch 2)", took == 2 && before == 2);
-      // The take then let note 100 go and played 24, below everything held, and the unit put it on channel 2:
-      // the note off freed that channel (FUN_00011E40) while its release still sounded.
+      ck("the 33rd note steals the channel the FS1R stole (ch 2)", took == 2 && before == 2);
+      // Then note 100 goes and 24 plays, below everything held, and the FS1R puts it on channel 2, since the note off freed that channel while its release still sounded.
       S.midi_in(0x80, 100, 0); S.render(l, r, 4);
       S.midi_in(0x90, 24, 100); S.render(l, r, 4);
       int low = -1;
       for (int i = 0; i < NCHAN; i++) if (S.ch[i].active && S.ch[i].note == 24) low = i;
-      ck("a note off frees its channel: the next note takes it, as the unit did (ch 2)", low == 2);
+      ck("a note off frees its channel: the next note takes it, as the FS1R did (ch 2)", low == 2);
       // #54: a machine full of released notes, their releases still sounding, takes 32 new notes and keeps every
       // one of them. Releases kept their channels until the EGs ran out, and new notes stole each other instead.
       S.all_off(); S.nextChan[0] = 0; for (int i = 0; i < 4; i++) S.partChan[i] = 0;
@@ -1292,9 +1248,8 @@ int selftest(Synth& S) {
           ck(noise ? "segments: with the unvoiced operators sounding too" : "segments: the loop in segments between ticks renders what the serial loop renders, whatever the block size", same);
       } }
 
-    // Bandwidth register 0 freezes the unvoiced walk (cal::WALK_STEP): taken there inside a note it stands still, and
-    // the operator is the carrier alone at the level the walk stood at, a pure sine. MEASURED on WouterVanNifterick's
-    // unit (docs/noise.md, 2026-11-02): bandwidth 40 to 0 inside a note is a pure sine within 2 ms.
+    // Bandwidth register 0 freezes the unvoiced walk (cal::WALK_STEP): taken there inside a note it stands still, and the operator is the carrier alone at the level the walk stood at, a pure sine.
+    // MEASURED on the FS1R, bandwidth 40 to 0 inside a note is a pure sine within 2 ms.
     { auto T = std::make_unique<Synth>(); init_perf(T->perf); Part& pt = T->perf.part[0]; Voice& V = pt.voice;
       pt.p[1] = 2; pt.p[4] = 0x10;
       init_blank_voice(V.raw);
@@ -1311,9 +1266,8 @@ int selftest(Synth& S) {
       for (int k = 0; k < SR / 8; k++) { T->render(&l, &r, 1); still = still && c->op[0].walk == w; lo = std::min(lo, c->last); hi = std::max(hi, c->last); }
       ck("walk: at bandwidth register 0 the walk stands still and the operator is a sine", still && w != 0 && hi > 0 && fabs(hi + lo) < 1e-3 * hi); }
 
-    // The unvoiced carriers and their walks run free per channel (keep_unvoiced): MEASURED on WouterVanNifterick's
-    // unit (docs/noise.md, 2026-11-02), a mono part's notes land on one channel whose carrier never stopped, and at
-    // bandwidth 0 the level the frozen walk stood at repeats over its notes. One unvoiced operator at 1 kHz, mono.
+    // The unvoiced carriers and their walks run free per channel (keep_unvoiced). MEASURED on the FS1R, a mono part's notes land on one channel whose carrier never stopped, and at bandwidth 0 the level the frozen walk stood at repeats over its notes.
+    // One unvoiced operator at 1 kHz, mono.
     { auto make = [](int bw, int level) {
           auto T = std::make_unique<Synth>(); init_perf(T->perf); Part& pt = T->perf.part[0]; Voice& V = pt.voice;
           pt.p[1] = 2; pt.p[4] = 0x10; pt.p[5] = 0;
@@ -1341,10 +1295,10 @@ int selftest(Synth& S) {
         for (int k = 0; k < n; k++) T->render(&l, &r, 1);
         const double want = p0 + inc * n;
         ck("free: an unheard carrier runs on", inc > 0 && !c->silent && fabs(c->op[0].nphase - (want - floor(want))) < 1e-9); }
-      { auto T = make(0, 99); double e = 0;   // MEASURED 2026-11-07: a channel's first note at bandwidth 0 is digital zero
+      { auto T = make(0, 99); double e = 0;   // MEASURED on the FS1R: a channel's first note at bandwidth 0 is digital zero
         T->midi_in(0x90, 60, 127); for (int i = 0; i < SR / 4; i++) { T->render(&l, &r, 1); e += fabs(l) + fabs(r); }
         ck("free: a channel's walk starts at 0, so its first note at bandwidth 0 is silent", e == 0.0); }
-      { double e[2] = {};   // MEASURED 2026-11-07: no two-sample mean, the walk reads -47.4 dB at a 1 kHz and a 16 kHz centre alike
+      { double e[2] = {};   // MEASURED on the FS1R: no two-sample mean, the walk reads -47.4 dB at a 1 kHz and a 16 kHz centre alike
         for (int k = 0; k < 2; k++) { auto T = make(96, 99); T->perf.part[0].voice.raw[112 + 35 + 1] = k ? 21 : 17;   // 16 kHz : 1 kHz, fine 24
           decode_voice(T->perf.part[0].voice);
           T->midi_in(0x90, 60, 127); for (int i = 0; i < SR / 20; i++) T->render(&l, &r, 1);
@@ -1472,7 +1426,7 @@ int selftest(Synth& S) {
       ck("Echo's Lch FB Level starts at +22", !strcmp(fb.text[echo.slot[1].init - fb.sysexMin], "+22"));
       ck("Echo's Lch Delay1 starts at 220.0 ms (14-bit, 0.1 ms)", echo.slot[0].init == 2200 && VALUE_TABLES[echo.slot[0].table].count == 0); }
 
-    // The effect chip: its dry path against the tap, a reverb, the type and parameter paths, the LFO rate and the wiring.
+    // The effect chip: its dry path against the digital output, a reverb, the type and parameter paths, the LFO rate and the wiring.
     { init_perf(S.perf);
       const uint8_t* init = (const uint8_t*)&S.perf;          // the Init performance's common bytes: every effect off, the EQ flat
       auto fresh = [&](std::initializer_list<std::pair<int, int>> set) {   // an effect section loaded with them and these bytes
@@ -1494,8 +1448,8 @@ int selftest(Synth& S) {
         drive(*e, 0, sine, l, r);
         double in = 0, out = 0; for (size_t i = n / 2; i < n; i++) { in += sine[i] * sine[i]; out += l[i] * l[i]; }
         ck("effect chip: the dry path at volume 127 is OUT_GAIN to 0.05 dB", fabs(10 * log10(out / in) - 20 * log10(cal::OUT_GAIN)) < 0.05); }
-      // 1b. the dry pair leaves the DACs one sample apart, left late, as on every hardware take (FSVR#97). An
-      // impulse on both halves of the dry bus: the sample each side first moves on.
+      // 1b. the dry pair leaves the DACs one sample apart, left late, as on the FS1R (FSVR#97).
+      // An impulse on both halves of the dry bus: the sample each side first moves on.
       { auto e = fresh({});
         std::vector<double> x(16, 0.0); x[0] = 0.1;
         drive(*e, 0, x, l, r);
@@ -1532,8 +1486,7 @@ int selftest(Synth& S) {
             for (size_t k = 0; k < env.size(); k++) { double ph = 2 * PI * f * k / 100.0; re += (env[k] - mean) * cos(ph); im -= (env[k] - mean) * sin(ph); }
             double m = sqrt(re * re + im * im); if (m > best) { best = m; hz = f; } }
         ck("effect chip: the insertion Tremolo runs at its default LFO Freq, 1.831 Hz", fabs(hz - 1.831) < 0.06); }
-      // 4b. s41: the insertion Chorus sweeps its delay at its default LFO Freq, 0.275 Hz, not twice it: the strongest
-      // 0.1..4 Hz component of the left output's instantaneous frequency, from its zero crossings
+      // 4b. the insertion Chorus sweeps its delay at its default LFO Freq, 0.275 Hz, not twice it: the strongest 0.1..4 Hz component of the left output's instantaneous frequency, from its zero crossings
       { auto t = fresh({{176, 64}, {179, 127}});
         fx::setType(t->host, fx::INSERTION, 1);
         drive(*t, 1, tone(1000, 8 * SR, 8 * SR), l, r);
@@ -1546,7 +1499,7 @@ int selftest(Synth& S) {
             double re = 0, im = 0;
             for (size_t k = 0; k < per.size(); k++) { double ph = 2 * PI * f * k / 1000.0; re += (per[k] - mean) * cos(ph); im -= (per[k] - mean) * sin(ph); }
             double m = sqrt(re * re + im * im); if (m > best) { best = m; hz = f; } }
-        ck("effect chip: the insertion Chorus sweeps at its default LFO Freq, 0.275 Hz (s41)", fabs(hz - 0.275) < 0.03); }
+        ck("effect chip: the insertion Chorus sweeps at its default LFO Freq, 0.275 Hz", fabs(hz - 0.275) < 0.03); }
       // 5. the variation Rotary SP on a 220 Hz sine does not hiss: under -70 dB of its energy above 4 kHz, from 1 s on
       { auto t = fresh({{172, 64}, {173, 100}});               // variation pan centre, return 100
         fx::setType(t->host, fx::VARIATION, 8);
@@ -1638,9 +1591,8 @@ int selftest(Synth& S) {
         ck("engine: a part on the insertion is heard through it", inserted > direct * 0.1f);
         ck("engine: a part on the insertion has no dry path", silent < direct * 0.001f);
         init_perf(S.perf); }
-      // 6b. taking a performance cuts the sound first, as the unit does: all sound off, so the channels go
-      // where they are rather than releasing. Before this only the plug-in's preset browser did it and a
-      // performance bulk from a host or the MIDI in left notes playing on through the new voices.
+      // 6b. taking a performance cuts the sound first, as the FS1R does: all sound off, so the channels go where they are rather than releasing.
+      // Before this only the plug-in's preset browser did it and a performance bulk from a host or the MIDI in left notes playing on through the new voices.
       { std::vector<float> a(256), b(256);
         uint8_t bulk[400];                                       // the performance as its own bulk
         memcpy(bulk, (const uint8_t*)&S.perf, 192);
@@ -1651,8 +1603,8 @@ int selftest(Synth& S) {
         perf_from_bytes(S, nullptr, bulk);
         ck("engine: a performance cuts the sound before it loads", sounding > 0 && S.active_chans() == 0);
         init_perf(S.perf); }
-      // 6c. a voice bulk silences its part first, a note still releasing too (FUN_0003d0dc, FUN_00010384), and
-      // leaves the other parts alone. Before, the release played on with the new voice's operators.
+      // 6c. a voice bulk silences its part first, a note still releasing too, and leaves the other parts alone.
+      // Before, the release played on with the new voice's operators.
       { std::vector<float> a(256), b(256);
         std::vector<uint8_t> bulk = {0xF0, 0x43, 0x00, 0x5E, 0x04, 0x60, 0x41, 0x00, 0x00};
         bulk.insert(bulk.end(), S.perf.part[0].voice.raw, S.perf.part[0].voice.raw + 608);
@@ -1690,9 +1642,9 @@ int selftest(Synth& S) {
         for (int i = 0; i < 16; i++) for (int v : {-128, 127, 0}) { h->setControlOffset(i, v); h->runPosted(); }
         for (int v : {-128, 127, 0}) { h->setSendReverbOffset(v); h->setSendVariationOffset(v); h->runPosted(); }
         for (int i = 0; i < (int)H::COMMON_BYTES; i++) perf[i] = (uint8_t)((i * 29 + 7) & 127);
-        perf[H::REVERB_TYPE] %= 17; perf[H::VARIATION_TYPE] %= 29; perf[H::INSERTION_TYPE] %= 41;   // types the unit has
+        perf[H::REVERB_TYPE] %= 17; perf[H::VARIATION_TYPE] %= 29; perf[H::INSERTION_TYPE] %= 41;   // types the FS1R has
         h->load(perf);
-        ck("effect host: its register writes are the firmware's", sink.h == 0x573bae0212dcff1eull); }
+        ck("effect host: its register writes are the FS1R's", sink.h == 0x573bae0212dcff1eull); }
       // 8. the filter's EG generators: a segment's time, its report, the acknowledgement, and a segment with no swing
       { auto c = std::make_unique<Modulators>();
         auto w = [&](int ch, int reg, int v) { c->write(reg, ch, (uint16_t)v); };
@@ -1706,9 +1658,7 @@ int selftest(Synth& S) {
         ck("filter EG: a rate write acknowledges the segment", c->read(EG_STATUS) == 0 && c->eg[3].level == 200);
         w(5, EG_RATE, 0); w(5, EG_TARGET, 100); w(5, EG_RATE, 40); w(5, EG_TARGET, 102); w(5, EG_AIM, 103);
         ck("filter EG: a segment with no swing takes FEG_FLAT_S", fabs(wait() - cal::FEG_FLAT_S) < 0.001); }
-      // 9. the filter host's register writes, pinned: sixteen notes through their EG segments, over every filter type
-      //    and LFO2 wave, the key sync and the firmware's slip, the sensitivities either side of 7 and segments with no
-      //    swing; then the part offsets and every byte marked alone.
+      // 9. the filter host's register writes, pinned: sixteen notes through their EG segments, over every filter type and LFO2 wave, the key sync and the FS1R's slip, the sensitivities either side of 7 and segments with no swing; then the part offsets and every byte marked alone.
       { using namespace fsvr::vop3host::filter;
         fx::HashSink sink;
         auto f = std::make_unique<fsvr::vop3host::FilterHost>(); f->sink = &sink;
@@ -1721,7 +1671,7 @@ int selftest(Synth& S) {
             uint8_t* V = f->voice[s & 3];
             V[FILTER_TYPE] = (uint8_t)(s & 7);                         // the six types and two past them
             V[LFO2_WAVE] = (uint8_t)((s * 3) & 7);
-            V[LFO2_KEY_SYNC] = s % 3 == 0; V[5] = s % 3 == 1;          // the key sync, and the firmware's slip on a name byte
+            V[LFO2_KEY_SYNC] = s % 3 == 0; V[5] = s % 3 == 1;          // the key sync, and the FS1R's slip on a name byte
             V[RESONANCE_VEL] = V[EG_DEPTH_VEL] = (uint8_t)s;
             if (s % 4 == 0) { V[EG_L1] = V[EG_L4]; V[EG_L3] = V[EG_L2]; }
             f->noteOn(s, s & 3, 30 + 5 * s, 20 + 7 * s);
@@ -1734,7 +1684,7 @@ int selftest(Synth& S) {
             for (int i = 0; i < f->PART_BYTES; i++) { f->mark(f->PART + i, p); f->flush(); } }
         for (int s = 0; s < 16; s++) f->kill(s);
         f->freeSlots();
-        ck("filter host: its register writes are the firmware's", sink.h == 0xf188051d637d4182ull); }
+        ck("filter host: its register writes are the FS1R's", sink.h == 0xf188051d637d4182ull); }
     }
 
     g_fails += selftest_patchfiles();   // selftest/patchfiles.cpp

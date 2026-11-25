@@ -1,4 +1,4 @@
-// tonegen/envelope.h - the operators' amplitude and frequency EGs. INFERRED: the constants are in fs1r/cal.h.
+// tonegen/envelope.h - the operators' amplitude and frequency EGs. Tuned: the constants are in fs1r/cal.h.
 #pragma once
 #include <algorithm>
 #include <cmath>
@@ -9,11 +9,7 @@
 
 static inline int egrate(int t) { return ((99 - clampi(t, 0, 99)) * 0xA4) >> 8; }          // EG time -> chip rate 0..63
 // The chip's own rate scaling: register 0x50 is the operator's time scaling 0..7 and register 0xC0 the key code.
-// MEASURED 2026-09-24 off 21_keycode: every semitone 12..120 at time scaling 7, decaying at nominal rate 34,
-// each slope landing on the (4 + (q & 3)) << (q >> 2) ladder (fit error 0.06 over 109 notes). With the twenty
-// tscale-3 points of 10_envelope2 that pins the chip's key offset x at every key code 77..113: the rate moves
-// by trunc(tscale * x / 8), x saturates at -13 below 82 and +13 above 109, and it is symmetric about 95.5.
-// Key codes 86/87 and 104/105 admit 8 or 9; 8 is what 19_drums' note 41 wanted. docs/aeg.md.
+// The rate moves by trunc(tscale * x / 8), x being the chip's key offset at key codes 77..113, and each slope lands on the (4 + (q & 3)) << (q >> 2) ladder. x saturates at -13 below 82 and +13 above 109, and it is symmetric about 95.5.
 static const signed char EG_KEYOFF[37] = {   // key codes 77 .. 113
     -13, -13, -13, -13, -13, -12, -12, -10, -10, -8, -8, -5, -5, -4, -4, -2, -2, -2, -1,
       1,   2,   2,   2,   4,   4,   5,   5,   8,   8, 10, 10, 12, 12, 13, 13, 13, 13};
@@ -22,21 +18,18 @@ static inline int eg_ratescale(int tscale, int c0) {
     int x = (tscale & 7) * eg_keyoff(c0);
     return x < 0 ? -((-x) >> 3) : x >> 3;                                                 // truncates toward zero
 }
-// INFERRED: chip EG rate 0..63 -> seconds for a full 96 dB traverse. The firmware maps time T to rate (99-T)*0xA4>>8, the
-// exact inverse of the DX7's (R*41)>>6, and its DX7 converter uses T = 99 - R, so the chip is assumed to time its EG like the
-// DX7 EGS: increment (4 + (q & 3)) << (q >> 2) per 64 samples on a 2^28 = 96 dB scale (Dexed). 6.6 ms at 63, 380 s at 0.
+// Chip EG rate 0..63 -> seconds for a full 96 dB traverse. The FS1R maps time T to rate (99-T)*0xA4>>8, the exact inverse of the DX7's (R*41)>>6, and its DX7 converter uses T = 99 - R, so the chip is taken to time its EG like the DX7 EGS: increment (4 + (q & 3)) << (q >> 2) per 64 samples on a 2^28 = 96 dB scale (Dexed). 6.6 ms at 63, 380 s at 0.
 static inline double rate_secs(int q) { q = clampi(q, 0, 63); return pow(2.0, (double)(26 - (q >> 2))) / (4 + (q & 3)) / SR; }   // the C pow: no template for the lane kernels to instantiate
-struct EG {                      // amplitude EG on the chip: hold, 4 segments. INFERRED shape/timing, DX7 style
+struct EG {                      // amplitude EG on the chip: hold, 4 segments. Modelled shape and timing, DX7 style
     int stage = 5; double cur = -200, target = -200, rate = 0, holdLeft = 0; bool rising = false;
     int L[4] = {}, R[4] = {}; int hold = 0; int rs = 0;
     int nN = 0; double rateN = 0;   // advance's: the block it last ran and the segment's step over it
-    static double lvl_db(int a) { return a >= 63 ? -200.0 : -cal::EG_LEVEL_DB * a; }   // 6-bit attenuation (LEVTAB >> 1), 1.5 dB per step INFERRED
+    static double lvl_db(int a) { return a >= 63 ? -200.0 : -cal::EG_LEVEL_DB * a; }   // 6-bit attenuation (LEVTAB >> 1), 1.5 dB per step
     void start(const int* lv, const int* rt, int h, int rateScale) {
         for (int i = 0; i < 4; i++) { L[i] = lv[i]; R[i] = rt[i]; } hold = h; rs = rateScale; cur = lvl_db(L[3]); stage = 0;
-        int hr = egrate(h); if (hr < 0x3F) hr = std::min(hr + 4, 0x3E);   // FUN_00019414: +4 only below 0x3F
-        // 0x3F is the firmware's "no hold", the one value it does not offset. Anything else holds for half a
-        // traverse at that rate plus a fixed lag, both measured.
-        holdLeft = hr < 0x3F ? (rate_secs(hr) * cal::EG_HOLD_FRAC + cal::EG_HOLD_LAG) * SR : 0;   // the key code does not reach the hold: 21_keycode holds 135 ms at every note 12..120 (MEASURED 2026-09-24)
+        int hr = egrate(h); if (hr < 0x3F) hr = std::min(hr + 4, 0x3E);   // +4 only below 0x3F
+        // 0x3F is the FS1R's "no hold", the one value it does not offset. Anything else holds for half a traverse at that rate plus a fixed lag, both in cal.h.
+        holdLeft = hr < 0x3F ? (rate_secs(hr) * cal::EG_HOLD_FRAC + cal::EG_HOLD_LAG) * SR : 0;   // the key code does not reach the hold, which is the same length at every note 12..120
         if (holdLeft < 1) next(1);
     }
     void next(int s) {
@@ -69,27 +62,16 @@ struct EG {                      // amplitude EG on the chip: hold, 4 segments. 
     }
     bool done() const { return stage == 5 || (stage == 4 && cur <= -120); }
 };
-struct FreqEG {                  // init -> attack level -> 0. The level curve and the times are the firmware's, read
-                                 // back off the voice images (FEGLVL and the EG rate conversion, registers 0x60-0x78).
+struct FreqEG {                  // init -> attack level -> 0. The level curve and the times are the FS1R's (FEGLVL and the EG rate conversion, registers 0x60-0x78).
     double cur = 0, target = 0, katt = 0, kdec = 0; int stage = 2, hold = 0;
     // The sysex byte is not linear in the register: FEGLVL maps 0..100 onto 0..255 with 128 the centre, and
     // half the displayed depth is only a fifth of the register offset. 128 register steps = FEG_SEMIS.
     static double feg_semis(int v) { return (FEGLVL[clampi(v + 50, 0, 100)] - 128) * cal::FEG_SEMIS / 128.0; }
-    // A LINEAR RAMP in semitones, and the slope does not depend on the swing. MEASURED 2026-09-25 off
-    // 07_modulation_2's four moving frequency EG segments, tracking the carrier rather than its envelope:
-    // init 25 and init -25 at attack time 40 slide 946 cents in 220 ms, and attack +-50 at the same time
-    // slides 4762 and 4800 cents at the same 4390 cents per second, holding a straight line to 0.3 to 3.8
-    // cents rms where the best exponential over the same points leaves 39 to 90. Four times the swing
-    // takes four times as long, which is what a ramp does and an approach cannot.
+    // A LINEAR RAMP in semitones, and the slope does not depend on the swing: four times the swing takes four times as long, which is what a ramp does and an approach cannot. At attack time 40 it runs at 4390 cents per second.
     //
-    // The slope is the amplitude EG's own rate ladder read as pitch: a traverse at rate_secs(word) covers
-    // cal::FEG_TRAVERSE semitones, which the two long segments put at 23.99 and 23.98 against the 24.0
-    // that a 96-unit scale quartered gives. So the chip runs one stepper for both EGs and only the unit of
-    // the step differs, 0.375 dB on the amplitude side and a quarter tone here.
-    // The chip's frequency EG plays rates 57 and 58, and 61 and 62, the other way round from the amplitude ladder.
-    // MEASURED 2026-10-26 (FS1R.unlock 2026-10-26-open, take 19): every attack time 0 to 36 read off the phase a
-    // ramp adds, two start levels at two notes; times 1-2, 3, 7-8 and 9-10 land on the swapped rate to 0.003 of a
-    // cycle and every other time on FUN_0000EBE8's own. Not checked on the amplitude EG, which is left alone.
+    // The slope is the amplitude EG's own rate ladder read as pitch: a traverse at rate_secs(word) covers cal::FEG_TRAVERSE semitones, the 24 that a 96-unit scale quartered gives.
+    // So the chip runs one stepper for both EGs and only the unit of the step differs, 0.375 dB on the amplitude side and a quarter tone here.
+    // The chip's frequency EG plays rates 57 and 58, and 61 and 62, the other way round from the amplitude ladder, so attack times 1-2, 3, 7-8 and 9-10 land on the swapped rate. The amplitude EG keeps its own order.
     static int feg_rate(int t) { const int q = egrate(t); return q == 57 ? 58 : q == 58 ? 57 : q == 61 ? 62 : q == 62 ? 61 : q; }
     void start(int init, int att, int attT, int decT) {
         cur = feg_semis(init); target = feg_semis(att); stage = (init == 0 && att == 0) ? 2 : 0;

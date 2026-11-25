@@ -36,9 +36,9 @@ if "%~1"=="" (
   set FSVR_SIMD=sse2
   "%~dp0bin\fsvr_console.exe" -selftest || goto :done
   set FSVR_SIMD=
-  python "%~dp0tools\check_isa.py" avx2 "%~dp0build\vop3host\isa2\*.obj" "%~dp0build\kernel\isa2\*.obj" || goto :done
-  python "%~dp0tools\check_formant.py" || goto :done
-  python "%~dp0tools\check_presets.py"
+  python "%~dp0tests\check_isa.py" avx2 "%~dp0build\vop3host\isa2\*.obj" "%~dp0build\kernel\isa2\*.obj" || goto :done
+  python "%~dp0tests\check_formant.py" || goto :done
+  python "%~dp0tests\check_presets.py"
 ) else if "%~1"=="plugin" (
   cmake -S . -B build\x64 -G "Visual Studio 17 2022" -A x64 -DFSVR_BUILD_PLUGIN=ON || goto :done
   cmake --build build\x64 --config Release -- -m || goto :done

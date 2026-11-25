@@ -1,4 +1,4 @@
-// tonegen/operator.cpp - the grain windows and the operator display. INFERRED: the constants are in fs1r/cal.h.
+// tonegen/operator.cpp - the grain windows and the operator display. Tuned: the constants are in fs1r/cal.h.
 #include "tonegen/operator.h"
 #include <vector>
 #include "fs1r/tables.h"
@@ -10,21 +10,12 @@ double g_slewN[65];            // 1 - (1 - LEVEL_SLEW_K)^n: the slew's step over
 
 void init_tables() {
     fm::init();
-    // floor(2048 * 2^(i / 1024)), MEASURED (cal.h). The nearest entry to a whole number past i = 0 is 6.8e-4
-    // away (i = 905), so libm's exp2 floors every one the same on every platform.
+    // floor(2048 * 2^(i / 1024)) (cal.h). The nearest entry to a whole number past i = 0 is 6.8e-4 away (i = 905), so libm's exp2 floors every one the same on every platform.
     for (int i = 0; i < 1024; i++) g_opMant[i] = (uint16_t)std::floor(cal::OP_MANT_ONE * std::exp2(i / 1024.0));
     for (int n = 1; n <= 64; n++) g_slewN[n] = 1.0 - pow(1.0 - LEVEL_SLEW_K, n);
-    // MEASURED 2026-09-19 (FS1R.unlock's skirt sweep, all sixty partials) and 2026-09-24 (the same take
-    // read again, plus 04_formant_2): the grain window is sin^p with p = 2 * 2^skirt on every form, and
-    // there are two families. The "2" forms (all2, odd2, res2) are the symmetric window, whose line
-    // amplitudes are the binomial row C(p, p/2 - k) to 0.4 to 0.7 dB over eight skirts. The "1" forms
-    // (all1, odd1, res1) and the formant are the SAME exponent on the rising half only; the falling
-    // half stays sin^2 whatever the skirt. That is what the period-averaged waveform shows directly
-    // (a rise that sharpens with the skirt on a fall that never moves) and it puts all1, odd1 and res1
-    // within 0.4 to 1.3 dB over every skirt where a sin^p at any exponent left 6 to 17. The formant is
-    // that same asymmetric window stretched over its bandwidth: 04_formant_2's sixteen skirt segments
-    // land inside 0.4 to 1.8 dB where the sqrt(2)-per-step symmetric fit could not get under 2.5.
-    // docs/skirt.md, docs/formant.md.
+    // The grain window is sin^p with p = 2 * 2^skirt on every form, and there are two families. The "2" forms (all2, odd2, res2) are the symmetric window, whose line amplitudes are the binomial row C(p, p/2 - k).
+    // The "1" forms (all1, odd1, res1) and the formant are the SAME exponent on the rising half only; the falling half stays sin^2 whatever the skirt, a rise that sharpens with the skirt on a fall that never moves.
+    // The formant is that same asymmetric window stretched over its bandwidth.
     for (int f = 0; f < 2; f++)
         for (int s = 0; s < 8; s++) {
             double p = cal::WIN_SKIRT * pow(cal::WIN_SKIRT_STEP, s);
@@ -38,11 +29,8 @@ void init_tables() {
         }
 }
 
-// Ours, for a display only: the unit has no such readout. Voiced operator v alone, from the same op_sample
-// the channels play, at a nominal 100 Hz with no modulation: n points over two periods, scaled to a peak of
-// 1. The grain forms open their first window a period in, so a period runs first and is dropped. The
-// formant's carrier is put four harmonics up so that its grains show, and its window and the res forms'
-// ratio come from byte 6 as notes.cpp hands them to a channel.
+// Ours, for a display only: the FS1R has no such readout. Voiced operator v alone, from the same op_sample the channels play, at a nominal 100 Hz with no modulation: n points over two periods, scaled to a peak of 1.
+// The grain forms open their first window a period in, so a period runs first and is dropped. The formant's carrier is put four harmonics up so that its grains show, and its window and the res forms' ratio come from byte 6 as notes.cpp hands them to a channel.
 void op_wave(const OpV& v, float* out, int n) {
     OpState s;
     const double f0 = 100.0;

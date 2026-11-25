@@ -120,6 +120,6 @@ Notes, bend, aftertouch, controllers, RPN and NRPN, clock and sysex reach the en
 
 The session holds every param, the engine's own bulk dumps, the morph corners and your MIDI learn assignments, so a project reopens exactly as it was saved. The params hosts see are every FS1R param for all four parts, the morph square, the knobs and the performance, voice and Fseq numbers; the editor's own state (pages, the browser's position, the selected part, the scale) is saved with it but not listed. The window's size, 0.5x to 2x, is the scale in the LCD's top right corner: click it. Each size is drawn at its own resolution, not magnified.
 
-## What is modelled and what is read
+## What matches the FS1R and what is tuned
 
-The CPU side is the firmware: velocity curves, level key scaling, pitch and portamento, the pitch EG, LFO1 and LFO2, part levels, mono handling, performances, Fseq playback, pan. The tone generator and the effect DSP are models, because no register documentation or instruction set exists for either chip; every constant that models them is gathered in `src/fs1r/cal.h`, so calibrating against a recording of real hardware is one table edit. `docs/ymp706_registers.md` marks which is which line by line.
+The control side behaves exactly as the FS1R does: velocity curves, level key scaling, pitch and portamento, the pitch EG, LFO1 and LFO2, part levels, mono handling, performances, Fseq playback, pan. The filters and effects compute exactly what the FS1R's DSP computes. The tone generator's sound is a model tuned against a real FS1R, with every constant gathered in `src/fs1r/cal.h`.

@@ -3,9 +3,7 @@
 
     python tools/extract_bonus.py   -> presets/bonus/1_Best_of_DX.syx, 2_Popular.syx, 3_Cyber.syx, 4_WX5.syx
 
-The pack was Yamaha's download at yamahasynth.com/download/fs1r/s_bonus.htm (updated 15/05/2000), now only
-on the Wayback Machine (snapshot 20080703223529). Each file written here is one internal-memory set as the
-unit takes it: 128 voices (0x51 nn) then 128 performances (0x11 nn), whose parts name those voices as Int.
+The pack was Yamaha's download at yamahasynth.com/download/fs1r/s_bonus.htm (updated 15/05/2000), now only on the Wayback Machine (snapshot 20080703223529). Each file written here is one internal-memory set as the FS1R takes it: 128 voices (0x51 nn) then 128 performances (0x11 nn), whose parts name those voices as Int.
 
   1_Best_of_DX  BestofDXVoice/Vdfs1r01.mid   Best of DX Voice, a Standard MIDI File of bulks
   2_Popular     Disk3/Sounds/POPULAR.MID      the same, as Yamaha also offered it alone (popular.zip)

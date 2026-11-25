@@ -146,8 +146,7 @@ bool Device::setState(const uint8_t* d, size_t len) {
         size_t n = j - i + 1;
         {
             std::lock_guard<std::mutex> lk(p->s.mtx);
-            // The system block getState wrote: the firmware's loader takes no system bulk, and this is the
-            // device's own state rather than a dump off the MIDI input, so it goes back byte for byte.
+            // The system block getState wrote: the FS1R's loader takes no system bulk, and this is the device's own state rather than a dump off the MIDI input, so it goes back byte for byte.
             if (n == 76 + 11 && d[i + 3] == 0x5E && d[i + 6] == 0x00) { memcpy(p->s.sys, d + i + 9, 76); any = true; }
             else if (load_sysex(p->s, p->rom.ok ? &p->rom : nullptr, d + i, n, 0, 0)) any = true;
             else if (apply_param_change_locked(p->s, d + i, n)) any = true;

@@ -1,11 +1,6 @@
-// The FS1R's voice filters: one voice (filters/voice_filter.h, run on lanes by kernel/isa/bank_kernel.cpp) per
-// firmware's filter host. In: the channels' samples. Out: the same channels, filtered. No chip is emulated:
-// the host's register writes are read for what they mean to a voice (Filter::write).
+// The FS1R's voice filters: one voice (filters/voice_filter.h, run on lanes by kernel/isa/bank_kernel.cpp) per slot of the filter host. In: the channels' samples. Out: the same channels, filtered. No chip is emulated: the host's register writes are read for what they mean to a voice (Filter::write).
 //
-// The firmware's host drives sixteen slots, the most the unit's one filter chip has. A Filter has a bank of
-// sixteen voices for every sixteen channels the engine can allocate, each with its own host and modulators, so
-// channel n is slot n & 15 of bank n >> 4. The unit uses bank 0 only; the rest are ours (docs/Differences.md,
-// 32 filtered voices and more than 32 voices).
+// The FS1R's host drives sixteen slots, the most its one filter chip has. A Filter has a bank of sixteen voices for every sixteen channels the engine can allocate, each with its own host and modulators, so channel n is slot n & 15 of bank n >> 4. The FS1R uses bank 0 only; the rest are ours (docs/Differences.md, 32 filtered voices and more than 32 voices).
 #pragma once
 #include <cstdint>
 #include "modulators/modulators.h"
@@ -15,7 +10,7 @@
 struct Filter {
     static constexpr int SLOTS = 16, BANKS = 8, VOICES = SLOTS * BANKS;   // BANKS: Synth::MAX_CHAN / SLOTS
 
-    // A bank: the firmware's host, the sixteen EGs and LFO2s it programs, and sixteen voices.
+    // A bank: the filter host, the sixteen EGs and LFO2s it programs, and sixteen voices.
     struct Bank final : fsvr::vop3host::WriteSink {
         fsvr::vop3host::FilterHost host;
         Modulators mod;
@@ -53,9 +48,7 @@ struct Filter {
         for (int b = 0; b < banks; b++) bank[b].sync(part, voice, rec, cutoffMod, lfo2Depth, lfo2Speed);
     }
     void flush(int banks) { for (int b = 0; b < banks; b++) bank[b].host.flush(); }
-    // One sample of the first 16 * banks channels, in place. Ours: a bank past the second rests while it has
-    // nothing to do (Bank::resting); banks 0 and 1 always run, so the unit's bank and the 32-voice engine render
-    // as they always did.
+    // One sample of the first 16 * banks channels, in place. Ours: a bank past the second rests while it has nothing to do (Bank::resting); banks 0 and 1 always run, so the FS1R's bank and the 32-voice engine render as they always did.
     static constexpr int ALWAYS = 2;
     void run(int banks, double* v) {
         for (int b = 0; b < banks; b++) {

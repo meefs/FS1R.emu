@@ -1259,7 +1259,7 @@
    "area2": "#86eac205",
    "glow": "#86eac222",
    "ring": "#25292cff",
-   "model": "fs1r.feg",
+   "model": "fsvr.feg",
    "inputs": {
     "L1": "voice.filter.eg_l1.{part}",
     "L2": "voice.filter.eg_l2.{part}",

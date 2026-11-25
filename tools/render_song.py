@@ -4,13 +4,11 @@
     python tools/render_song.py                    01_Vokodrone, the usual baseline
     python tools/render_song.py "04 Fat Line"      any song, by name or number
     python tools/render_song.py 9 --out mine.wav   somewhere of your choosing
-    python tools/render_song.py "captures/demo_nofilterfx/04_Fat Line.mid"    a song from another folder
+    python tools/render_song.py path/to/song.mid    any other Standard MIDI File
 
-Writes <song folder>/baseline/<song> <commit>.wav unless --out says otherwise, so two renders
+Writes build/songs/<song> <commit>.wav unless --out says otherwise, so two renders
 from different builds sit next to each other and say which is which. Warns if the engine binary
 is older than the source, since a baseline off a stale build is worse than none.
-
-tools/demo_probe.py cut <song> puts the unit's own take of the same song beside ours for an A/B.
 """
 import argparse
 import subprocess
@@ -20,12 +18,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 EXE = ROOT / "bin/fsvr_console.exe"
 ROM = ROOT.parent / "FS1R_DISASM/roms/fs1r_v120_eprom_cpuview.bin"
-SONGS = ROOT / "captures/demo"
+SONGS = ROOT / "demosongs"
 
 
 def find_song(name):
     if name.lower().endswith(".mid") and Path(name).exists():
-        return Path(name)                               # any file, such as captures/demo_nofilterfx/
+        return Path(name)                               # any file
     mids = sorted(SONGS.glob("[0-9]*.mid"))
     if not mids:
         sys.exit("no demo songs in %s: run tools/extract_demo.py first" % SONGS)
@@ -61,7 +59,7 @@ def commit():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("song", nargs="?", default="01_Vokodrone")
-    ap.add_argument("--out", help="output wav (default captures/demo/baseline/<song> <commit>.wav)")
+    ap.add_argument("--out", help="output wav (default build/songs/<song> <commit>.wav)")
     ap.add_argument("--rom", default=str(ROM), help="EPROM image, for the preset banks the demo plays")
     ap.add_argument("--tail", type=float, default=3.0, help="seconds of tail after the last event")
     a = ap.parse_args()
@@ -72,7 +70,7 @@ def main():
     if newest > EXE.stat().st_mtime:
         print("warning: src/ is newer than the engine binary, run build.bat for a current baseline")
     mid = find_song(a.song)
-    out = Path(a.out) if a.out else mid.parent / "baseline" / ("%s %s.wav" % (mid.stem, commit()))
+    out = Path(a.out) if a.out else ROOT / "build/songs" / ("%s %s.wav" % (mid.stem, commit()))
     out.parent.mkdir(parents=True, exist_ok=True)
 
     cmd = [str(EXE)]

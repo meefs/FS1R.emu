@@ -1,7 +1,7 @@
 // patchfiles/container_fsvr.cpp - FSVR's own .fsvr preset: XML whose <sysex> holds the stream in base64. Ours.
 //
 // Export Preset writes it (plugin.cpp): <fsvr version="1"> with <name>, <category> and <sysex encoding="base64">,
-// the performance, its voices and its Fseq as the unit dumps them. Only the sysex is read here; the name is
+// the performance, its voices and its Fseq as the FS1R dumps them. Only the sysex is read here; the name is
 // already the performance's own.
 #include "reading.h"
 #include <cstring>

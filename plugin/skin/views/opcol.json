@@ -1996,7 +1996,7 @@
    "glow": "@op{op}_line/22",
    "ring": "#25292cff",
    "width": 1,
-   "model": "fs1r.aeg",
+   "model": "fsvr.aeg",
    "inputs": {
     "L1": "op.{op}.{layer}.eg_l1.{part}",
     "L2": "op.{op}.{layer}.eg_l2.{part}",

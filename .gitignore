@@ -2,26 +2,12 @@ build/
 bin/
 *.wav
 *.obj
-.vscode/
-
-# capture working files: the requests are tracked, recordings and analysis are not
-captures/engine/
-captures/hardware/
-captures/analysis/
-captures/demo/render/
-captures/raw/
 *.flac
+.vscode/
+__pycache__/
 
 # the Hollow editor's tile and glyph exports, kept next to plugin/skin
 plugin/tiles/
-__pycache__/
-
-# the calibration log tools/demo_probe.py appends to
-tools/demo_scores.txt
-
-# reference manuals kept in docs/ for reading, not redistributed
-docs/*.pdf
 
 # Blender keeps the previous save beside the file
 *.blend1
-__pycache__/

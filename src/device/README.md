@@ -1,6 +1,6 @@
 # src/device: the public device
 
-`fsvr::Device`, declared in `src/fs1r.h`: the one surface the plugin, the console and the tools use. **Ours.**
+`fsvr::Device`, declared in `src/fsvr.h`: the one surface the plugin, the console and the tools use. **Ours.**
 
 | File | What |
 |---|---|

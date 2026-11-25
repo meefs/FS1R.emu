@@ -21,8 +21,8 @@ bool clampVced(uint8_t* vced);                     // to the DX7's ranges and a 
 void initVoice(uint8_t* vced);                     // the DX7's INIT VOICE
 
 // An AMEM slot unpacked to the 49-byte ACED in the layout the FS1R reads (Data List 3.2.2), and whether it
-// would change the conversion: the firmware reads only the amp mod senses, PEG range, its velocity switch
-// and PEG rate scaling (FUN_00035918, FUN_00035E96), all of them 0 in a DX7 voice's default slot.
+// would change the conversion: the FS1R reads only the amp mod senses, PEG range, its velocity switch
+// and PEG rate scaling, all of them 0 in a DX7 voice's default slot.
 void amemToAced(const uint8_t* slot, uint8_t* aced);
 bool acedMatters(const uint8_t* aced);
 

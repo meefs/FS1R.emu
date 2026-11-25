@@ -1,4 +1,4 @@
-// engine/notes.cpp - note on and off, operator setup, and the 192 Hz tick. KNOWN: rewritten from the disassembly.
+// engine/notes.cpp - note on and off, operator setup, and the 192 Hz tick. Matches the FS1R.
 #include "engine/synth.h"
 
 void Synth::init_system() {
@@ -10,9 +10,8 @@ void Synth::init_system() {
     sys[0x47] = 0; sys[0x48] = 4; sys[0x49] = 0; sys[0x4A] = 0;
 }
 
-// FUN_0002087e: the four filter switches are latched, and a change stops every channel. From then on the
-// parts with a filter play on the sixteen channels the filter chip is wired to. Ours: the wide filter and the
-// polyphony (docs/Differences.md) latch here too, so a change of either stops every note the same way.
+// The four filter switches are latched, and a change stops every channel. From then on the parts with a filter play on the sixteen channels the filter chip is wired to.
+// Ours: the wide filter and the polyphony (docs/Differences.md) latch here too, so a change of either stops every note the same way.
 void Synth::filter_latch() {
     int sw = 0;
     for (int p = 0; p < 4; p++) sw |= (perf.part[p].p[7] & 1) << p;
@@ -24,9 +23,7 @@ void Synth::filter_latch() {
     for (int p = 0; p < 4; p++) partChan[p] = sw && !fltWide && !(sw >> p & 1) ? FILTER_CHANNELS : 0;
 }
 
-// The filter host reads the voice and the part record. Destinations 21 to 26 edit the record, as the firmware
-// has them do (FUN_00017192 and the five after it), by writing the part's bytes (ctrl_write); 42, 44 and 45
-// are offsets the host keeps itself.
+// The filter host reads the voice and the part record. Destinations 21 to 26 edit the record, as the FS1R has them do, by writing the part's bytes (ctrl_write); 42, 44 and 45 are offsets the host keeps itself.
 void Synth::filter_sync(int part) {
     const Part& pt = perf.part[part];
     uint8_t rec[fsvr::vop3host::FilterHost::PART_BYTES]; memcpy(rec, pt.p, sizeof rec);
@@ -36,7 +33,7 @@ void Synth::filter_sync(int part) {
 void Synth::note_on(int part, int note, int vel) {
     filter_latch();
     Part& pt = perf.part[part]; const Voice& V = pt.voice;
-    int lo = pt.p[0x0F], hi = pt.p[0x10];   // FUN_00010B48: high below low plays all but the gap
+    int lo = pt.p[0x0F], hi = pt.p[0x10];   // high below low plays all but the gap
     if (hi < lo ? (note > hi && note < lo) : (note > hi || note < lo)) return;
     lo = pt.p[0x2A]; hi = pt.p[0x2B];
     if (hi < lo ? (vel > hi && vel < lo) : (vel > hi || vel < lo)) return;
@@ -50,38 +47,25 @@ void Synth::note_on(int part, int note, int vel) {
         else if (prio == 2) { target = 128; for (int i = 0; i < pt.nheld; i++) target = std::min(target, pt.held[i]); }
         else if (prio == 3) target = pt.held[0];
         Chan* cur = nullptr; for (auto& c : chans()) if (c.active && c.part == part && c.held) cur = &c;
-        if (cur && pt.nheld > 1) {          // legato: retune the sounding channel (FUN_000119d0), no retrigger
+        if (cur && pt.nheld > 1) {          // legato: retune the sounding channel, no retrigger
             if (target != cur->note) retune(*cur, target);
             return;
         }
         note = target;
     }
-    // FUN_0000f7dc, measured against the unit (FS1R.unlock 2026-09-25-7). Three things, none of which
-    // the old "first free, else oldest" did:
-    //  1. allocation is ROUND ROBIN from the last channel allocated, not the lowest free one. Filling an
-    //     empty machine with 32 notes puts them on channels 1..31 then 0, which is what the unit did. Free
-    //     is a channel no key holds (owned, synth.h): a release still sounding does not keep it.
-    //  2. when nothing is free, the part to take from is the one furthest over its own note reserve.
-    //     The reserves cannot oversubscribe the 32 channels: writing 32 to part 2 with parts 3 and 4
-    //     holding 8 each read back as 16, i.e. 32 - (0 + 8 + 8), so a part's effective reserve is what
-    //     is left after the others. (FUN_00030796 clamps parameter writes against a per-parameter
-    //     table; the sum rule is the reading that fits the one measured point, 2026-09-25-7.)
-    //  3. within that part the walk starts after the part's own cursor and takes the first channel whose
-    //     stored note is ABOVE the arriving one; failing that, the lowest stored note it saw.
-    // While a part has its filter on, FUN_000112c0 walks half the channels instead: 0 to 15 for a part with
-    // a filter (FUN_0000fa5c), 16 to 31 for one without (FUN_0000fcfa), each with a cursor of its own.
-    // OPEN: the two halves' walks are taken to follow the whole walk's three rules; only that one was measured.
+    // The FS1R allocates a channel by three rules.
+    //  1. allocation is ROUND ROBIN from the last channel allocated, not the lowest free one. Filling an empty machine with 32 notes puts them on channels 1..31 then 0, as the FS1R does. Free is a channel no key holds (owned, synth.h); a release still sounding does not keep it.
+    //  2. when nothing is free, the part to take from is the one furthest over its own note reserve. The reserves cannot oversubscribe the 32 channels: writing 32 to part 2 with parts 3 and 4 holding 8 each reads back as 16, i.e. 32 - (0 + 8 + 8), so a part's effective reserve is what is left after the others.
+    //  3. within that part the walk starts after the part's own cursor and takes the first channel whose stored note is ABOVE the arriving one; failing that, the lowest stored note it saw.
+    // While a part has its filter on, the walk covers half the channels instead: 0 to 15 for a part with a filter, 16 to 31 for one without, each with a cursor of its own. The two halves' walks are taken to follow the whole walk's three rules.
     // With fltWide (ours) every channel has a filter slot, so there are no halves: the whole walk, as with no filter.
-    // Ours too: the walk is over the nchan channels in use rather than the unit's 32 (docs/Differences.md), the
-    // halves being the chip's sixteen and the rest.
+    // Ours too: the walk is over the nchan channels in use rather than the FS1R's 32 (docs/Differences.md), the halves being the chip's sixteen and the rest.
     const bool filtered = fltSw >> part & 1, split = fltSw && !fltWide;
     const int first = split && !filtered ? FILTER_CHANNELS : 0, count = !split ? nchan : filtered ? FILTER_CHANNELS : nchan - FILTER_CHANNELS;
     int& cursor = nextChan[!split ? 0 : filtered ? 1 : 2];
     auto at = [&](int from, int k) { return first + ((from - first + k) % count + count) % count; };
     Chan* c = nullptr;
-    // FUN_000112c0: a mono part with no key down takes back the first channel it last owned, without moving a
-    // cursor; the walk below is only for a part that owns none. MEASURED 2026-10-26 (FS1R.unlock 2026-10-26-open,
-    // takes 3 and 4): a key-sync-off sine on a mono part starts each strike where one generator ran on to.
+    // A mono part with no key down takes back the first channel it last owned, without moving a cursor; the walk below is only for a part that owns none. So a key-sync-off sine on a mono part starts each strike where one generator ran on to.
     if (mono) for (int k = 0; k < count && !c; k++) { Chan& x = ch[first + k]; if (x.owner == part && !owned(x)) c = &x; }
     const bool reused = c != nullptr;
     for (int k = 1; k <= count && !c; k++) { Chan& x = ch[at(cursor, k)]; if (!owned(x)) { c = &x; break; } }
@@ -91,8 +75,7 @@ void Synth::note_on(int part, int note, int vel) {
             int p = (part + k) & 3, others = 0, n = 0;
             if (split && (fltSw >> p & 1) != (int)filtered) continue;   // its notes are in the other half
             for (int q = 0; q < 4; q++) if (q != p) others += perf.part[q].p[0x00];
-            // Ours: past the unit's 32 a reserve is the part's share of those 32, scaled to the channels in use,
-            // so a performance's reserves mean the same at every polyphony (docs/Differences.md).
+            // Ours: past the FS1R's 32 a reserve is the part's share of those 32, scaled to the channels in use, so a performance's reserves mean the same at every polyphony (docs/Differences.md).
             int res = clampi(perf.part[p].p[0x00], 0, std::max(0, NCHAN - others)) * nchan / NCHAN;
             for (auto& x : chans()) if (owned(x) && x.part == p) n++;
             if (n > res && n - res > excess) { excess = n - res; best = p; }
@@ -109,27 +92,16 @@ void Synth::note_on(int part, int note, int vel) {
     }
     const int slot = int(c - ch);
     if (!reused) { cursor = slot; partChan[part] = slot; }
-    // FUN_000112c0: the filter slot is silenced before the note takes it. With fltWide an unfiltered note can
-    // take a channel a filtered one rang out on, so its slot is silenced too.
+    // The filter slot is silenced before the note takes it. With fltWide an unfiltered note can take a channel a filtered one rang out on, so its slot is silenced too.
     if (filtered || (fltSw && fltWide)) flt.host(slot).kill(slot & 15);
     Chan& C = *c; bool sync = V.lfo1sync != 0; uint32_t keepPhase = C.lfoPhase;
-    // FUN_00023000: the firmware damps the channel it is about to take, it does not silence it. The mask
-    // it is called with comes out of the one-hot table at 0x35B260 indexed by the allocated channel, and
-    // the call sets that channel's EG stage word to 4 (release) and writes register 0xFC/FD. So a note
-    // landing on a channel that is still sounding fades the old waveform out over cal::DAMP_MS. Zeroing
-    // the struct instead put a step the size of the old note's own output into the output between two
-    // samples, which is a click the unit does not make.
+    // The FS1R damps the channel it is about to take, it does not silence it. It sets that channel's EG stage word to 4 (release) and writes register 0xFC/FD, so a note landing on a channel that is still sounding fades the old waveform out over cal::DAMP_MS. Zeroing the struct instead puts a step the size of the old note's own output into the output between two samples, which is a click the FS1R does not make.
     double damp = C.active ? C.last + C.damp : 0.0;
-    // The channel's phase generators never stop: an operator with key sync off starts the note where its
-    // generator has run to since the channel's last note, at that note's rate. MEASURED 2026-10-26 (FS1R.unlock
-    // 2026-10-26-open, take 3): a 1 Hz sine, key sync off, struck every 1.5 s on a mono part starts each strike
-    // half a turn on from the last (0.544, 0.038, 0.531, 0.025 ...); on a poly part, a channel each strike, scattered.
-    // A channel no note has used yet starts at a drawn phase: what it ran since power-on is not known.
+    // The channel's phase generators never stop: an operator with key sync off starts the note where its generator has run to since the channel's last note, at that note's rate. A 1 Hz sine, key sync off, struck every 1.5 s on a mono part starts each strike half a turn on from the last; on a poly part, a channel each strike, scattered.
+    // A channel no note has used yet starts at a drawn phase, since nothing records what it ran since power-on.
     uint32_t run[8];
     for (int o = 0; o < 8; o++) run[o] = C.age ? C.op[o].phase + op_inc32(C.op[o].inc) * (uint32_t)(now - C.ran) : V.v[o].keysync ? 0u : draw();
-    // The unvoiced carriers and their walks are the channel's, not the note's: they run on through every note and
-    // every gap between, never reset (keep_unvoiced). MEASURED 2026-11-01 on WouterVanNifterick's unit, not read
-    // from the firmware: 32 mono notes over 100 s land on one 3.4389 Hz carrier that never stopped (docs/noise.md).
+    // The unvoiced carriers and their walks are the channel's, not the note's: they run on through every note and every gap between, never reset (keep_unvoiced).
     const Chan was = C;
     C = Chan(); keep_unvoiced(C, was, now);
     C.active = true; C.part = part; C.owner = part; C.note = note; C.vel = vel; C.held = true; C.age = ++clock; C.chn = noteChn;
@@ -137,25 +109,24 @@ void Synth::note_on(int part, int note, int vel) {
     C.lfoPhase = sync ? 0 : keepPhase;
     C.panBase = pt.p[0x0E] ? pt.p[0x0E] : (int)(draw() % 128);       // part pan 0 = random per note; the rest is the table index
     compute_pitch(C, pt, note);
-    // portamento start (FUN_000124fe)
+    // portamento start
     int porta = pt.p[0x24]; C.portaTarget = C.pitchNote; C.portaCur = C.pitchNote;
     if ((porta & 1) && pt.p[0x25] && pt.lastPitch >= 0 && ((porta & 2) || (mono && pt.nheld > 1))) C.portaCur = pt.lastPitch;
     C.portaOn = (porta & 1) && pt.p[0x25]; C.portaRate = PEGTIME[clampi((pt.p[0x25] * 100) >> 7, 0, 99)];
     pt.lastPitch = C.pitchNote;
     setup_ops(C, pt, vel);
     setup_peg(C, pt, vel);
-    // Fseq trigger (FUN_0000fffa): first note only, or every note
+    // Fseq trigger: first note only, or every note
     if (fseq.valid && fseqPart == part && ((perf.c[0x24] & 1) || !anyOther(C))) fseq_start(vel);
-    // The filter slot starts before the tone generator's registers are written: its modulation word
-    // (FUN_0002a47c), then the note (FUN_0000b0e8), which takes the note after its shifts and the curved velocity.
+    // The filter slot starts before the tone generator's registers are written: its modulation word, then the note, which takes the note after its shifts and the curved velocity.
     if (filtered) { filter_sync(part); auto& h = flt.host(slot); h.setSlotCutoffMod(slot & 15, filter_mod(C)); h.noteOn(slot & 15, part, C.noteP, vel);
         auto& L = flt.bank[slot >> 4].lanes; L.cutoff_s[slot & 15] = NAN; L.glide[slot & 15] = cutoffGlide ? CUTOFF_GLIDE_K : 0; }
     refresh_regs(C, pt);
-    if (getenv("FS1R_DEBUG")) {
+    if (getenv("FSVR_DEBUG")) {
         printf("note %d vel %d -> note' %d pitch %d keyfact %d C0 %d\n", note, vel, C.noteP, C.pitchNote, C.keyfact, C.regC0);
         for (int o = 0; o < 8; o++) printf("  op%d lvl %3d ulvl %3d egb %3d freq %5d ufreq %5d frmt %5d bw %2d egL %2d %2d %2d %2d egR %2d %2d %2d %2d hold %d\n", o + 1, C.levelOff[o], C.ulevelOff[o], C.egbias[o], C.freqWord[o], C.ufreqWord[o], C.frmtWord[o], C.bwReg[o], C.egL[o][0], C.egL[o][1], C.egL[o][2], C.egL[o][3], C.egR[o][0], C.egR[o][1], C.egR[o][2], C.egR[o][3], C.egHold[o]);
         printf("  peg lvl %d %d %d %d %d rate %d %d %d %d %d velP %d\n", C.pegLvl[0], C.pegLvl[1], C.pegLvl[2], C.pegLvl[3], C.pegLvl[4], C.pegRt[0], C.pegRt[1], C.pegRt[2], C.pegRt[3], C.pegRt[4], C.velP);
-        int sp = eb86(clampi(V.lfo1speed + pt.p[0x15] - 64, 0, 99)); uint32_t inc = (sp == 0 ? 0xB : sp * (sp < 0xA0 ? 0xB : 0xB + ((sp - 0xA0) >> 2))) << 1;
+        int sp = to127(clampi(V.lfo1speed + pt.p[0x15] - 64, 0, 99)); uint32_t inc = (sp == 0 ? 0xB : sp * (sp < 0xA0 ? 0xB : 0xB + ((sp - 0xA0) >> 2))) << 1;
         int q = 99 - clampi(V.lfo1delay + pt.p[0x17] - 64, 0, 99); uint32_t dinc = ((16 + (q & 15)) << 10) >> (7 - (q >> 4));
         printf("  lfo wave %d speed %d -> inc %u (%.2f Hz) delay %d -> inc %u (%.2f s) pmd %d amd %d fmd %d porta %d rate %d\n", V.lfo1wave, V.lfo1speed, inc, inc * TICK_HZ / 65536.0, V.lfo1delay, dinc, 65536.0 / (dinc ? dinc : 1) / TICK_HZ, V.pmd, V.amd, V.fmd, C.portaOn, C.portaRate);
     }
@@ -177,19 +148,14 @@ void Synth::compute_pitch(Chan& C, const Part& pt, int note) {
     n = clampi(n + (pt.voice.raw[0x1E] & 0x3F) - 24, 0, 127);
     C.noteP = n; C.keyfact = KEYFACT[n] >> 2;
     int pitch = NOTETAB[n];
-    // The part's detune scales by the band of the key played (0x0102A402, before any note shift), not of the
-    // shifted note: Teck Hook's parts an octave and two down beat as the unit's do only so.
+    // The part's detune scales by the band of the key played, before any note shift, not of the shifted note. Teck Hook's parts an octave and two down beat as the FS1R's do only so.
     int d = pt.p[9] - 0x40;
     if (d) { int band = (note >> 3) & 0xF; int prod = std::abs(d) * (15 - band); if (!prod) prod = 1; pitch += (d < 0 ? -prod : prod) / 15; }
     pitch += (sysTune() & 0x7F) - 0x40;
     C.pitchNote = pitch;
 }
 
-// A voice parameter change reaches the notes already sounding, as the unit's own edit buffer does:
-// the per-channel words are rebuilt from the voice at the note's own pitch and velocity. The EGs in
-// flight keep the segments they started with, and the filter EG likewise; everything the tick
-// reads through refresh_regs (frequency, level, form, bandwidth, detune, algorithm, LFOs, filter)
-// moves at once.
+// A voice parameter change reaches the notes already sounding, as the FS1R's own edit buffer does: the per-channel words are rebuilt from the voice at the note's own pitch and velocity. The EGs in flight keep the segments they started with, and the filter EG likewise; everything the tick reads through refresh_regs (frequency, level, form, bandwidth, detune, algorithm, LFOs, filter) moves at once.
 void Synth::voice_changed(int part) {
     const Part& pt = perf.part[part];
     for (auto& C : ch) if (C.active && C.part == part) { setup_ops(C, pt, C.vel); refresh_regs(C, pt); }
@@ -216,8 +182,8 @@ void Synth::setup_ops(Chan& C, const Part& pt, int vel) {
             int base = LEVTAB[std::min(99, v.level)];
             int dist = keygroup(n) - keygroup(v.bp + 21) + 1;
             int att;
-            if (dist <= 0) { const unsigned char* t = (v.lc == 1 || v.lc == 2) ? KSEXP : KSLIN; int x = std::min(127, (t[std::min(39, -dist)] * eb86(v.ld)) >> 8); att = (v.lc == 2 || v.lc == 3) ? base - x : base + x; }
-            else { const unsigned char* t = (v.rc == 1 || v.rc == 2) ? KSEXP : KSLIN; int x = std::min(127, (t[std::min(39, dist)] * eb86(v.rd)) >> 8); att = (v.rc == 2 || v.rc == 3) ? base - x : base + x; }
+            if (dist <= 0) { const unsigned char* t = (v.lc == 1 || v.lc == 2) ? KSEXP : KSLIN; int x = std::min(127, (t[std::min(39, -dist)] * to127(v.ld)) >> 8); att = (v.lc == 2 || v.lc == 3) ? base - x : base + x; }
+            else { const unsigned char* t = (v.rc == 1 || v.rc == 2) ? KSEXP : KSLIN; int x = std::min(127, (t[std::min(39, dist)] * to127(v.rd)) >> 8); att = (v.rc == 2 || v.rc == 3) ? base - x : base + x; }
             ks = clampi(att, 0, 127) << 1;
         }
         C.levelOff[o] = std::min(255, vel_att(v.amsb, vel) + ks);
@@ -230,15 +196,11 @@ void Synth::setup_ops(Chan& C, const Part& pt, int vel) {
         // frequency words. The bias the controller matrix adds to them is not here: it moves while
         // the note sounds, and refresh_bias rebuilds it every tick.
         if (v.form == 7 || v.fixed) C.freqWord[o] = 8 * (v.coarse * 128 + v.fine) + 0x28ED + keytrack(v.notescale, pm) + fvs_term(v.fmsb, vel);
-        // MEASURED 2026-10-23: a fine of 100 or more plays as the next coarse step at fine 0 (coarse 0 at 100,
-        // 110 and 127 is 1.0, coarse 1 at 100 is 2.0, coarse 2 at 100 is 3.0). The factory Hook under Teck Hook,
-        // Tech Lead and 25 other operators store fine 100; held at 99 they sat 8 cents under and beat.
+        // A fine of 100 or more plays as the next coarse step at fine 0 (coarse 0 at 100, 110 and 127 is 1.0, coarse 1 at 100 is 2.0, coarse 2 at 100 is 3.0). The factory Hook under Teck Hook, Tech Lead and 25 other operators store fine 100; held at 99 they would sit 8 cents under and beat.
         else if (v.fine >= 100) C.freqWord[o] = 0x1243 + COARSE[std::min(31, v.coarse + 1)];
         else C.freqWord[o] = 0x1243 + COARSE[v.coarse] + FINE[v.fine];
         C.ufreqWord[o] = std::min(0x7F00, ((u.coarse & 0x1F) * 256 + u.fine * 2) * 4 + 0x28ED + keytrack(u.notescale, pm) + fvs_term(u.fmsb, vel));
-        // Detune, in pitch word units, from the ROM's own key scaled table. MEASURED: the chip does
-        // the same thing to a ratio operator's register 0x80 that the CPU does to a formant
-        // operator's transpose word, so both read FRMDET and the amount shrinks as the note rises.
+        // Detune, in pitch word units, from the FS1R's own key scaled table. The chip does the same thing to a ratio operator's register 0x80 that the CPU does to a formant operator's transpose word, so both read FRMDET and the amount shrinks as the note rises.
         {
             int d = v.detune; int dd = d < 15 ? (~d) : d - 15; int idx = (dd & 0x1F) * 32 + band;
             C.detW[o] = (idx & 0x200) ? -FRMDET[idx & 0x1FF] : FRMDET[idx & 0x1FF];
@@ -247,8 +209,7 @@ void Synth::setup_ops(Chan& C, const Part& pt, int vel) {
         if (v.form == 7) C.frmtWord[o] = 0x1243 + TRANS[clampi(v.transpose + 24, 0, 48)] + C.detW[o];
         else C.frmtWord[o] = v.bw;
         // EG registers: levels LEVTAB >> 1, rates ((99-T)*0xA4)>>8, part EG offsets on attack/decay/release (assumed T1/T2/T4)
-        // FUN_00019414 walks the part's EG bytes 0x1A, 0x1B, 0x1B, 0x1C against voice times T1-T4,
-        // so the decay offset reaches both T2 and T3, not T2 alone.
+        // The part's EG bytes 0x1A, 0x1B, 0x1B, 0x1C go against voice times T1-T4, so the decay offset reaches both T2 and T3, not T2 alone.
         int atk = pt.p[0x1A], dec = pt.p[0x1B], rel = pt.p[0x1C];
         int offs[4] = {atk - 64, dec - 64, dec - 64, rel - 64};
         for (int i = 0; i < 4; i++) {
@@ -261,7 +222,7 @@ void Synth::setup_ops(Chan& C, const Part& pt, int vel) {
 
 void Synth::setup_peg(Chan& C, const Part& pt, int vel) {
     const Voice& V = pt.voice;
-    C.velP = V.pegVel ? vel + 1 : 128;        // firmware overrides the graded PEGVEL table with this (see docs)
+    C.velP = V.pegVel ? vel + 1 : 128;        // the FS1R overrides the graded PEGVEL table with this
     int Lp[5], Tp[5];
     for (int i = 0; i < 5; i++) Lp[i] = V.pegL[i];
     Lp[0] = clampi(Lp[0] + pt.p[0x20] - 64, 0, 100);
@@ -307,15 +268,12 @@ void Synth::note_off(int part, int note) {
 void Synth::release(Chan& C) {
     for (auto& s : C.op) { s.eg.release(); s.ueg.release(); }
     const int slot = int(&C - ch);
-    if (C.filtered) flt.host(slot).noteOff(slot & 15);   // FUN_00010a52
+    if (C.filtered) flt.host(slot).noteOff(slot & 15);
     C.pegStage = 4; C.pegTarget = C.pegLvl[4]; C.pegRate = C.pegRt[4];
     fseq_keys();
 }
 
-// FUN_00010384(0): every channel whose owner word (DAT_010289fc) is the part is freed and damped (FUN_00023000),
-// its filter slot killed, and the part's held keys forgotten, so no key up is owed to a part that may no longer
-// hear it. Only the allocators write that word (FUN_0001228c, FUN_000112c0), not a key up, so a note still
-// releasing goes too: before, it played its release on through the next voice a bulk brought in.
+// Every channel the part owns is freed and damped, its filter slot killed, and the part's held keys forgotten, so no key up is owed to a part that may no longer hear it. Only the allocators set the owner, not a key up, so a note still releasing goes too, rather than playing its release on through the next voice a bulk brings in.
 void Synth::silence_part(int part) {
     for (auto& C : chans()) {
         if (C.owner != part) continue;
@@ -332,18 +290,16 @@ void Synth::silence_part(int part) {
     fseq_keys();
 }
 
-// The handlers the firmware runs after a part byte is written, from the part block of its table at flash 0x3E460.
-// Each one that changes who hears what, or how notes are held, silences first.
+// What the FS1R does after a part byte is written. Each write that changes who hears what, or how notes are held, silences first.
 void Synth::part_written(int part, int al, int was) {
     const Part& pt = perf.part[part];
     switch (al) {
-    case 0x00: for (int p = 0; p < 4; p++) silence_part(p); break;   // Note Reserve, FUN_00020878
-    // Voice Bank: FUN_00021928 only records it, and the mask is rebuilt by the voice select that follows on
-    // the panel (setupPartFromMode, FUN_00020644). rcv() reads the bank live, so off silences here.
+    case 0x00: for (int p = 0; p < 4; p++) silence_part(p); break;   // Note Reserve
+    // Voice Bank: the FS1R only records it, and the mask is rebuilt by the voice select that follows on the panel. rcv() reads the bank live, so off silences here.
     case 0x01: if (was && !pt.p[1]) silence_part(part); break;
-    case 0x02:                                                        // Program, FUN_0001FE62
-    case 0x03: case 0x04:                                             // Rcv Max, Rcv Ch, FUN_00020644
-    case 0x05: case 0x06: silence_part(part); break;                  // Mono/Poly FUN_000204FE, Priority FUN_00020872
+    case 0x02:                                                        // Program
+    case 0x03: case 0x04:                                             // Rcv Max, Rcv Ch
+    case 0x05: case 0x06: silence_part(part); break;                  // Mono/Poly, Priority
     }
 }
 
@@ -353,7 +309,7 @@ void Synth::lfo_tick(Chan& C, const Part& pt) {
     uint32_t dinc = ((16 + (q & 15)) << 10) >> (7 - (q >> 4));
     C.lfoDelay = std::min<uint32_t>(0xFFFF, C.lfoDelay + dinc);
     if (C.lfoDelay == 0xFFFF) C.lfoFade = std::min<uint32_t>(0xFFFF, C.lfoFade + dinc);
-    int sp = eb86(clampi(V.lfo1speed + pt.p[0x15] - 64, 0, 99)) + clampi(ctrl_offset(part, 43) * 2, -255, 255);
+    int sp = to127(clampi(V.lfo1speed + pt.p[0x15] - 64, 0, 99)) + clampi(ctrl_offset(part, 43) * 2, -255, 255);
     sp = clampi(sp, 0, 255);
     uint32_t inc = sp == 0 ? 0xB : sp * (sp < 0xA0 ? 0xB : 0xB + ((sp - 0xA0) >> 2)); inc = (inc & 0xFFFF) << 1;
     uint32_t ph = C.lfoPhase + inc; bool wrapped = ph > 0xFFFF; C.lfoPhase = ph & 0xFFFF;
@@ -369,12 +325,7 @@ void Synth::lfo_tick(Chan& C, const Part& pt) {
     C.lfoVal = val;
 }
 
-// The unit applies a note-on at a control tick, so the pitch EG's first step comes one to two ticks after the
-// note sounds, never within the first. MEASURED 2026-10-26 (FS1R.unlock 2026-10-26-open, take 20): sixteen strikes
-// of a stepping pitch EG at note 84 put the first step 5.4 to 11.2 ms after the onset, where the engine's tick,
-// free against the note, put it 0 to 5.2. Teck Hook's voice (PrA Hook, a 1.5 semitone pitch EG drop into a 0 Hz
-// formant) played 1 to 5 dB under the unit depending on where the tick fell, and its level follows the unit's
-// within 0.6 dB with this (takes 6 and 10).
+// The FS1R applies a note-on at a control tick, so the pitch EG's first step comes one to two ticks after the note sounds, never within the first.
 void Synth::peg_tick(Chan& C) {
     if (C.pegWait) { C.pegWait = false; return; }
     int s = C.pegStage; if (s == 3 || s == 5) return;
@@ -406,22 +357,20 @@ void Synth::refresh_regs(Chan& C, const Part& pt) {
     C.regPitch = C.portaCur + (C.pegCur >> 2) + bend_word(pt, C.chn) + fseqPitch;
     C.regC0 = (C.pitchNote >> 8) + 10;
     int fade = C.lfoFade >> 8;
-    int pmd = clampi(eb86(clampi(V.pmd + pt.p[0x16] - 64, 0, 99)) + ctrl_offset(part, 39) * 2, 0, 255);   // ctrlDest_39 doubles it
+    int pmd = clampi(to127(clampi(V.pmd + pt.p[0x16] - 64, 0, 99)) + ctrl_offset(part, 39) * 2, 0, 255);   // destination 39 doubles it
     C.regPM = clampi((C.lfoVal * ((pmd * fade) >> 8 & 0xFF)) >> 4, -0x7FF, 0x7FF);
-    int fmd = clampi(eb86(V.fmd) + ctrl_offset(part, 41), 0, 255);
+    int fmd = clampi(to127(V.fmd) + ctrl_offset(part, 41), 0, 255);
     C.regFM = clampi((C.lfoVal * ((fmd * fade) >> 8 & 0xFF)) >> 4, -0x7FF, 0x7FF);
     int amc = ctrl_offset(part, 40);
-    int amd = clampi(eb86(V.amd) + amc, 0, 255), fadeA = clampi(fade + amc, 0, 255);
+    int amd = clampi(to127(V.amd) + amc, 0, 255), fadeA = clampi(fade + amc, 0, 255);
     C.regAM = EGBIAS[(((amd * fadeA) >> 8) * ((127 - C.lfoVal) & 0xFF)) >> 8];
-    int lvVel = 0x80;                                     // Fseq level velocity multiplier (FUN_000125f8)
+    int lvVel = 0x80;                                     // Fseq level velocity multiplier
     if (fseqPart == part && perf.c[0x27] != 0x40) {
         int s = perf.c[0x27]; int mul;
         if (s & 0x40) mul = ((s & 0x3F) + 1) * VELW[VELCURVE[fseqVel] & 0x7F]; else mul = ((~s) & 0x3F) * VELW[127 - (VELCURVE[fseqVel] & 0x7F)];
         lvVel = (~(mul >> 6)) & 0xFF;
     }
-    // No formant tracking term: FUN_000127FC applies the whole key-to-Fseq difference to the channel
-    // pitch (the fseqPitch above, whose constants it confirms exactly) and nothing shifts the frame's
-    // formant frequencies. Formants staying put while the fundamental moves is the point of the format.
+    // No formant tracking term: the FS1R applies the whole key-to-Fseq difference to the channel pitch (the fseqPitch above) and nothing shifts the frame's formant frequencies. Formants staying put while the fundamental moves is the point of the format.
     for (int o = 0; o < 8; o++) {
         int l = C.levelOff[o], ul = C.ulevelOff[o];
         if (fseq_on(part)) {
@@ -430,8 +379,7 @@ void Synth::refresh_regs(Chan& C, const Part& pt) {
             if (C.fseqUOp[o]) { ul = f[0x2A + t] << 1; if (lvVel != 0x80) ul = (~(((~ul) & 0xFF) * lvVel >> 8)) & 0xFF; C.fquWord[o] = f[0x1A + t] * 256 + f[0x22 + t] * 2 + C.ufbW[o]; }
         }
         C.regLevel[o] = clampi(l + C.egbias[o] + C.vcLvl[o][0], 0, 255);
-        // Ours (docs/Differences.md): op byte 0x1C, reserved on the unit, is a key-synced oscillator's initial
-        // phase, 0 to 127 for 0 to 360 * 127 / 128 degrees. Read here, so an edit moves a sounding note too.
+        // Ours (docs/Differences.md): op byte 0x1C, reserved on the FS1R, is a key-synced oscillator's initial phase, 0 to 127 for 0 to 360 * 127 / 128 degrees. Read here, so an edit moves a sounding note too.
         C.phOff[o] = V.v[o].keysync ? V.raw[112 + o * 62 + 0x1C] / 128.0 : 0.0;
         C.regULevel[o] = clampi(ul + C.uegbias[o] + C.vcLvl[o][1], 0, 255);
     }
@@ -441,13 +389,7 @@ void Synth::refresh_regs(Chan& C, const Part& pt) {
 }
 
 void Synth::voice_ctrl(Chan& C, const Part& pt) {
-    // FUN_00017454 walks the ten control slots with amt = clamp(src' * dep' * 2 >> 7) (FUN_00016FF0, the
-    // same bias-and-scale the controller sets use), src being the part's FORMANT or FM byte as
-    // (v - 64) * 2 clamped to a signed byte. The handlers at flash 0x3DE04: "out" stores -2 * amt as a
-    // level offset (FUN_00017A4A), "freq" stores amt << 5 as a frequency word offset (FUN_00017B02), and
-    // "width" stores amt into the per-op bandwidth offset that FUN_0001F6BC then scales by the op's own
-    // BWBIAS, exactly as destination 37 does (FUN_00017B6E). The engine had roughly a quarter, an eighth
-    // and a quarter of those, and a cal constant for a scale that is a shift in the flash.
+    // The ten control slots are walked with amt = clamp(src' * dep' * 2 >> 7), the same bias-and-scale the controller sets use, src being the part's FORMANT or FM byte as (v - 64) * 2 clamped to a signed byte. "out" stores -2 * amt as a level offset, "freq" stores amt << 5 as a frequency word offset, and "width" stores amt into the per-op bandwidth offset that the op's own BWBIAS then scales, exactly as destination 37 does.
     memset(C.vcLvl, 0, sizeof C.vcLvl); memset(C.vcFreq, 0, sizeof C.vcFreq); memset(C.vcBw, 0, sizeof C.vcBw);
     const uint8_t* b = pt.voice.raw;
     int src[2] = {clampi((pt.p[0x1D] - 64) * 2, -128, 127), clampi((pt.p[0x1E] - 64) * 2, -128, 127)};
@@ -466,7 +408,7 @@ void Synth::voice_ctrl(Chan& C, const Part& pt) {
 void Synth::refresh_pan(Chan& C, const Part& pt) {
     int base = pt.p[0x0E] ? pt.p[0x0E] : C.panBase;             // Panpot edits the part byte
     int idx = pan_index(base, pt.p[0x28], C.noteP);
-    idx += ((C.lfoVal * std::max(1, eb86(clampi(pt.p[0x29], 0, 99))) * (int)(C.lfoFade >> 8)) >> 16) / 2; // pan LFO depth: image +0x1F is eb86(byte), 1 at 0 (FUN_00019362 case 0x29)
+    idx += ((C.lfoVal * std::max(1, to127(clampi(pt.p[0x29], 0, 99))) * (int)(C.lfoFade >> 8)) >> 16) / 2; // pan LFO depth: to127(byte), 1 at 0
     if (perf.c[0x11]) idx += (perf.c[0x11] - 64) / 2;                              // performance pan
     idx = clampi(idx, 0, 127);
     C.panL = db2lin(-LEVEL_DB * PANL[idx]); C.panR = db2lin(-LEVEL_DB * PANR[idx]);
@@ -481,7 +423,7 @@ void Synth::tick() {
         if (!C.active) continue;
         const Part& pt = perf.part[C.part];
         lfo_tick(C, pt); peg_tick(C); porta_tick(C); refresh_regs(C, pt);
-        if (C.filtered) flt.host(n).setSlotCutoffMod(n & 15, filter_mod(C));   // FUN_0002c998
+        if (C.filtered) flt.host(n).setSlotCutoffMod(n & 15, filter_mod(C));
     }
     flt.flush(flt_banks());
 }

@@ -34,7 +34,7 @@ int channel(int s) { return (s + 2) & 15; }
 const uint8_t* voiceOf(const Host& h, int p) { return p < 4 ? h.voice[p] : NONE; }
 const uint8_t* partOf(const Host& h, int p) { return p < 4 ? h.part[p] : NONE; }
 
-// The firmware's clamp: through sixteen bits first.
+// The FS1R's clamp: through sixteen bits first.
 int clamp16(int v, int lo, int hi)
 {
     v = int16_t(v);
@@ -112,7 +112,7 @@ int egDepth(const Host& h, int s, const uint8_t* V, const uint8_t* R)
 // ---- LFO2 ----
 void lfoWave(Host& h, int ch, int wave)
 {
-    const int bits = wave <= 5 ? wave << 5 : wave == 6 ? 224 : wave;    // past 6 the firmware ORs the byte in as it came
+    const int bits = wave <= 5 ? wave << 5 : wave == 6 ? 224 : wave;    // past 6 the FS1R ORs the byte in as it came
     h.lfoReg[1][ch] = uint16_t((h.lfoReg[1][ch] & 0xFF1F) | bits);
     h.writeLfo(LFO_WAVE, ch);
 }
@@ -239,7 +239,7 @@ void FilterHost::noteOn(int s, int p, int n, int v)
     setLfo(h, s, V, R, p);
     if (V[LFO2_KEY_SYNC] == 1)
         lfoPhase(h, ch, V[LFO2_PHASE]);
-    else if (V[5] == 1)                                     // a byte of the voice's name: the firmware's own slip,
+    else if (V[5] == 1)                                     // a byte of the voice's name: the FS1R's own slip,
         lfoPhase(h, ch, ch);                                // with the channel as the phase
     setEgDepth(h, s, egDepth(h, s, V, R));
     setGain(h, s, false, V[INPUT_GAIN]);
@@ -297,7 +297,7 @@ void FilterHost::egInterrupt()
                 index = HELD;
                 break;
             case DONE:                                      // held, so it does not report; were it to, it would get
-                break;                                      // what the channel before it got, as on the unit
+                break;                                      // what the channel before it got, as on the FS1R
         }
         egRate(h, ch, flt::EG_RATE[index]);
         egTarget(h, ch, target = clamp16(target, -511, 511));

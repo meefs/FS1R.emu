@@ -314,7 +314,7 @@
    "area2": "@op1_line/05",
    "glow": "@op1_line/22",
    "ring": "#25292cff",
-   "model": "fs1r.aeg",
+   "model": "fsvr.aeg",
    "inputs": {
     "L1": "op.1.{layer}.eg_l1.{part}",
     "L2": "op.1.{layer}.eg_l2.{part}",
@@ -528,7 +528,7 @@
    "area2": "@op2_line/05",
    "glow": "@op2_line/22",
    "ring": "#25292cff",
-   "model": "fs1r.aeg",
+   "model": "fsvr.aeg",
    "inputs": {
     "L1": "op.2.{layer}.eg_l1.{part}",
     "L2": "op.2.{layer}.eg_l2.{part}",
@@ -742,7 +742,7 @@
    "area2": "@op3_line/05",
    "glow": "@op3_line/22",
    "ring": "#25292cff",
-   "model": "fs1r.aeg",
+   "model": "fsvr.aeg",
    "inputs": {
     "L1": "op.3.{layer}.eg_l1.{part}",
     "L2": "op.3.{layer}.eg_l2.{part}",
@@ -956,7 +956,7 @@
    "area2": "@op4_line/05",
    "glow": "@op4_line/22",
    "ring": "#25292cff",
-   "model": "fs1r.aeg",
+   "model": "fsvr.aeg",
    "inputs": {
     "L1": "op.4.{layer}.eg_l1.{part}",
     "L2": "op.4.{layer}.eg_l2.{part}",
@@ -1170,7 +1170,7 @@
    "area2": "@op5_line/05",
    "glow": "@op5_line/22",
    "ring": "#25292cff",
-   "model": "fs1r.aeg",
+   "model": "fsvr.aeg",
    "inputs": {
     "L1": "op.5.{layer}.eg_l1.{part}",
     "L2": "op.5.{layer}.eg_l2.{part}",
@@ -1384,7 +1384,7 @@
    "area2": "@op6_line/05",
    "glow": "@op6_line/22",
    "ring": "#25292cff",
-   "model": "fs1r.aeg",
+   "model": "fsvr.aeg",
    "inputs": {
     "L1": "op.6.{layer}.eg_l1.{part}",
     "L2": "op.6.{layer}.eg_l2.{part}",
@@ -1598,7 +1598,7 @@
    "area2": "@op7_line/05",
    "glow": "@op7_line/22",
    "ring": "#25292cff",
-   "model": "fs1r.aeg",
+   "model": "fsvr.aeg",
    "inputs": {
     "L1": "op.7.{layer}.eg_l1.{part}",
     "L2": "op.7.{layer}.eg_l2.{part}",
@@ -1812,7 +1812,7 @@
    "area2": "@op8_line/05",
    "glow": "@op8_line/22",
    "ring": "#25292cff",
-   "model": "fs1r.aeg",
+   "model": "fsvr.aeg",
    "inputs": {
     "L1": "op.8.{layer}.eg_l1.{part}",
     "L2": "op.8.{layer}.eg_l2.{part}",

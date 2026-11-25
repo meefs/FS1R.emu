@@ -1,11 +1,11 @@
-// The register map the firmware's filter and effect hosts write (the YSS236 DSP's), and the LFO waves.
+// The register map the FS1R's filter and effect hosts write (the YSS236 DSP's), and the LFO waves.
 #pragma once
 #include <cstdint>
 
 namespace vop3 {
 
-// The chip's registers, by the number the firmware writes to. 0x01, 0x05, 0x1C and 0x28..0x2A
-// are written at boot or after a phase reset and are not named anywhere.
+// The chip's registers, by the number the hosts write to.
+// 0x01, 0x05, 0x1C and 0x28..0x2A are written at boot or after a phase reset and are not named anywhere.
 enum Reg : uint32_t {
     SELECT          = 0x00,     // the step, slot, LFO or EG the next writes go to
     COEF            = 0x0B,     // a step's constant

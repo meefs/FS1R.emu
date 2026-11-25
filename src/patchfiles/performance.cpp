@@ -1,6 +1,6 @@
 // patchfiles/performance.cpp - a DX performance as an FS1R performance bulk and the voices of its parts. Ours.
 //
-// The unit has no such conversion: the firmware takes only VCED and ACED. So every choice here and in the
+// The FS1R has no such conversion: the FS1R takes only VCED and ACED. So every choice here and in the
 // formats that fill a PartSetup is ours, not the hardware's. The bulk starts from the engine's init
 // performance (init_perf), and a DX performance changes its name, its effects (dxEffects) and the part bytes
 // PartSetup names.
@@ -23,8 +23,8 @@ constexpr int PAN_CENTRE = 64, PAN_LEFTMOST = 16, PAN_RIGHTMOST = 112;
 
 // Ours: the effects a DX performance gets, after Yamaha's own Best of DX bonus set (presets/bonus), which gives its
 // DX sounds Hall1 at return 64 and a chorus. Here the chorus is the insertion, on every part that plays, a little
-// drier than its type's default, and sends to the reverb. Each type's other parameters are the unit's defaults for
-// it, as choosing the type on the unit sets them.
+// drier than its type's default, and sends to the reverb. Each type's other parameters are the FS1R's defaults for
+// it, as choosing the type on the FS1R sets them.
 constexpr uint8_t HALL1 = 1, CHORUS = 1, REVERB_RETURN = 64, INSERTION_LEVEL = 127, INSERTION_TO_REVERB = 16;
 constexpr uint8_t CHORUS_DRY_WET = 48;   // 64 is D=W
 constexpr uint8_t PART_INSERTION_SW = 0x14;
@@ -135,11 +135,11 @@ static int voiceFor(Reading& r, int number, From from) {
 
 // Ours, settled against the TX802 factory set (P.SYX and A1, A2, B1, B2 beside it): a TX802 voice number counts
 // I01-I64, C01-C64, then the ROM's presets A01-A64 and B01-B64, and the factory performances name the presets
-// (0x82 is A03, ReverbBras). The presets cannot be in a dump of the unit's memory. The set sends them as the four
+// (0x82 is A03, ReverbBras). The presets cannot be in a dump of the FS1R's memory. The set sends them as the four
 // files A1, A2, B1, B2, VMEMs with no bank select, which number on 0-127 in that order; so a preset voice is
 // looked up at its number less 128, among banks that came with no bank select. When the TX802 performances read
 // name a preset voice, those banks are taken to be the presets, and none of them then stands for a voice of
-// the unit's memory.
+// the FS1R's memory.
 constexpr int TX802_PRESETS = 128;
 
 static bool presetBanks(const Reading& r) {

@@ -1,4 +1,4 @@
-# The FSVR plug-in: fs1rLib behind the Hollow GUI (hollow/), whose skin is skin/. Every format lands in
+# The FSVR plug-in: fsvrLib behind the Hollow GUI (hollow/), whose skin is skin/. Every format lands in
 # bin/<format> (hollow_add_plugin's BIN). The processor never models synthesis; see plugin.cpp.
 include(FetchContent)
 # Import Audio's decoders, both public domain: dr_wav (WAV, AIFF) and dr_mp3, and stb_vorbis.
@@ -31,7 +31,7 @@ hollow_add_plugin(fsvr
   AU_SUBTYPE Fsvr
   WINDOWS_ICON "${PROJECT_SOURCE_DIR}/icon.ico"
   MACOS_ICON "${PROJECT_SOURCE_DIR}/icon.icns"
-  BIN "${FS1R_BIN}")
+  BIN "${FSVR_BIN}")
 
 # The license and the notices go beside each format in bin/, so every per-format zip carries them, named for
 # FSVR so they never collide with another vendor's files in a shared plug-in folder. The installer packs only
@@ -46,14 +46,14 @@ foreach(pair "clap|CLAP" "vst3|VST3" "auv2|AU" "standalone|Standalone" "vst2|${f
   list(GET pair 1 dir)
   if(TARGET fsvr_${t})
     add_custom_command(TARGET fsvr_${t} POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E make_directory "${FS1R_BIN}/${dir}"
-      COMMAND "${CMAKE_COMMAND}" -E copy "${PROJECT_SOURCE_DIR}/LICENSE" "${FS1R_BIN}/${dir}/FSVR-LICENSE.txt"
-      COMMAND "${CMAKE_COMMAND}" -E copy "${PROJECT_SOURCE_DIR}/NOTICE.md" "${FS1R_BIN}/${dir}/FSVR-NOTICE.md"
+      COMMAND "${CMAKE_COMMAND}" -E make_directory "${FSVR_BIN}/${dir}"
+      COMMAND "${CMAKE_COMMAND}" -E copy "${PROJECT_SOURCE_DIR}/LICENSE" "${FSVR_BIN}/${dir}/FSVR-LICENSE.txt"
+      COMMAND "${CMAKE_COMMAND}" -E copy "${PROJECT_SOURCE_DIR}/NOTICE.md" "${FSVR_BIN}/${dir}/FSVR-NOTICE.md"
       VERBATIM)
   endif()
 endforeach()
 
-target_link_libraries(fsvr_lib PRIVATE fs1rLib)
+target_link_libraries(fsvr_lib PRIVATE fsvrLib)
 target_compile_definitions(fsvr_lib PRIVATE FSVR_VERSION="${PROJECT_VERSION}")
 target_include_directories(fsvr_lib PRIVATE "${dr_libs_SOURCE_DIR}" "${stb_SOURCE_DIR}")
 if(WIN32)
@@ -62,15 +62,15 @@ elseif(APPLE)
   target_link_libraries(fsvr_lib PRIVATE "-framework AudioToolbox" "-framework CoreFoundation")
 endif()
 
-# The processor's own check: banks, the sysex round trip, morph, Import Audio (tools/check_plugin.cpp).
-add_executable(check_plugin "${PROJECT_SOURCE_DIR}/tools/check_plugin.cpp")
+# The processor's own check: banks, the sysex round trip, morph, Import Audio (tests/check_plugin.cpp).
+add_executable(check_plugin "${PROJECT_SOURCE_DIR}/tests/check_plugin.cpp")
 target_link_libraries(check_plugin PRIVATE fsvr_lib)
 target_include_directories(check_plugin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 set_target_properties(check_plugin PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<1:${CMAKE_BINARY_DIR}>")
 add_test(NAME plugin COMMAND check_plugin)
 
-# The editor's own check: the skin and the processor driven through a windowless Gui (tools/check_gui.cpp).
-add_executable(check_gui "${PROJECT_SOURCE_DIR}/tools/check_gui.cpp")
+# The editor's own check: the skin and the processor driven through a windowless Gui (tests/check_gui.cpp).
+add_executable(check_gui "${PROJECT_SOURCE_DIR}/tests/check_gui.cpp")
 target_link_libraries(check_gui PRIVATE fsvr_lib)
 target_include_directories(check_gui PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 set_target_properties(check_gui PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<1:${CMAKE_BINARY_DIR}>")
