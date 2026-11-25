@@ -78,8 +78,8 @@
    "fine": 0.2,
    "wheel": 0.029,
    "reset": "default",
-   "param": "perf.volume",
-   "tip": "The performance's volume"
+   "param": "master.volume",
+   "tip": "FSVR's output level, 64 is unity, 0 and 128 are 12 dB down and up"
   },
   {
    "type": "number",
@@ -105,7 +105,7 @@
    "fine": 0.2,
    "reset": false,
    "editable": true,
-   "param": "perf.volume"
+   "param": "master.volume"
   },
   {
    "type": "plate",

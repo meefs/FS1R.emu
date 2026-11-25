@@ -233,7 +233,7 @@ Hollow's `tools/overflow.py` measures text against its widget with the skin's ow
 - **Quick Control page (Easy).** The knob captioned "LFO2" is LFO2's depth; it reads "LFO2 Dep" beside "LFO2 Spd".
 - **Browser.** The Channels column read "ch pfm"; it reads "Perf", or the channel numbers. The FS1R's "--" category reads "No category" in the category list. A fresh instance plays the performance its LCD and browser name (A001), rather than FSVR's init performance under A001's name.
 - **Fseq lengths.** The Fseq page said "steps" while the browser said "frames"; both say frames, the owner's manual's word.
-- **Performance page.** With the unit-only settings gone it regroups into Performance, Master, MIDI (channel, program mode, notes, device, knob transmit), MIDI Receive (bank select, program change, sysex, bulk dump protect, knobs) and Controller Numbers.
+- **Performance page.** With the unit-only settings gone it regroups into Master, Performance, MIDI (channel, program mode, notes, device, knob transmit), MIDI Receive (bank select, program change, sysex, bulk dump protect, knobs) and Controller Numbers. Master stands over Performance and is laid out as it is: a Volume fader, the Master Volume that the top bar's knob also turns, then Tune where Performance has Pan, and Note Shift, Vel Curve and BC Curve in Performance's three rows.
 
 ## The Parts page
 

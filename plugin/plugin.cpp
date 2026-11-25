@@ -302,6 +302,8 @@ public:
         if (const int s = (int)std::lround(get(speed)); s != speedSent) dev.setSpeed(speedSent = s);
         if (const int f = (int)std::lround(get(filter32)); f != filter32Sent) dev.setFilterPoly32((filter32Sent = f) != 0);
         if (const int n = (int)std::lround(get(polyOpt)); n != polySent) dev.setPolyphony(kPoly[polySent = std::clamp(n, 0, 3)]);
+        // Master Volume, ours: a level on FSVR's output, 64 unity and 12 dB down at 0 and up at 128 (#67).
+        if (const double g = get(masterVol); g != gainSent) dev.setGain(std::pow(10.0, ((gainSent = g) - 64.0) * 12.0 / 64.0 / 20.0));
         std::unique_lock<std::mutex> lk(ctl, std::try_to_lock);
         const unsigned loads = st.loads();
         const bool live = lk.owns_lock() && !(loads & 1) && loads == loadsSeen;
@@ -377,8 +379,9 @@ private:
     static constexpr size_t kScale = sizeof kOptions / sizeof kOptions[0];
     static constexpr int kPoly[4] = {32, 64, 96, 128};   // opt.poly's steps, the voices Device::setPolyphony gets
     double options[kScale + 1] = {};   // as Settings.json has them
-    int loadLast = -1, speed = -1, filter32 = -1, polyOpt = -1;
+    int loadLast = -1, speed = -1, filter32 = -1, polyOpt = -1, masterVol = -1;
     int speedSent = -1, filter32Sent = -1, polySent = -1;   // the audio thread's: the speed, filter voices and polyphony the engine has
+    double gainSent = -1;                                    // and the Master Volume it has
     bool standalone = st.data("live.standalone") == "1";   // the format layer says so before we start
     std::string startup;               // the .fsvr a fresh instance plays first, if not A001
     bool restoredOnce = false;         // a session has come back since we started
@@ -460,7 +463,7 @@ private:
         fseqBank = P("fseq.bank"); fseqNumber = P("fseq.number"); fseqUser = P("fseq.user"); fseqPart = P("fseq.part"); fseqPos = P("fseq.position");
         panic = P("gui.panic");
         perfCategory = P("perf.category"); edited = P("gui.edited"); saveBank = P("save.bank");
-        loadLast = P("opt.load_last"); speed = P("opt.speed"); filter32 = P("opt.filter32"); polyOpt = P("opt.poly");
+        loadLast = P("opt.load_last"); speed = P("opt.speed"); filter32 = P("opt.filter32"); polyOpt = P("opt.poly"); masterVol = P("master.volume");
         itemCategory = P("item.category"); itemReadonly = P("item.readonly"); itemKind = P("item.kind"); bankReadonly = P("bank.readonly");
         browseBank = P("browse.bank"); browseCategory = P("browse.category"); browsePerf = P("browse.perf"); browseFseq = P("browse.fseq");
         browseFocus = P("browse.focus");

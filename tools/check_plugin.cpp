@@ -854,6 +854,7 @@ int main() {
             CHECK(s.until([&] { return fs::exists(tmp / "Init.fsvr") && s.data("opt.init_name") == "Snow Decay"; }), "Use Current wrote no Init.fsvr");
             s.set("perf.program", 2);
             CHECK(s.until([&] { return s.data("perf.name") == "Nightmare"; }), "A003 did not load in the standalone");
+            s.set("master.volume", 100);
             s.proc->saving();
             closed = s.st->save();
         }
@@ -873,6 +874,7 @@ int main() {
             s.st->load(closed);
             CHECK(s.until([&] { return s.data("perf.name") == "Snow Decay" && s.data("perf.user.name") == "Snow Decay"; }),
                   "Load Last Patch off, the standalone reopened on \"%s\", not the Init Patch", s.data("perf.name").c_str());
+            CHECK(s.is("master.volume", 100), "Master Volume came back as %g in the reopened standalone, not 100", s.get("master.volume"));
         }
         std::string settings = "{\"loadLast\": 1}\n";
         writeBytes(tmp / "Settings.json", std::vector<uint8_t>(settings.begin(), settings.end()));
@@ -903,7 +905,25 @@ int main() {
             s.st->load(closed);
             s.until([] { return false; }, 400);
             CHECK(s.data("perf.name") == "Nightmare", "a host's session came back as \"%s\"", s.data("perf.name").c_str());
+            CHECK(s.is("master.volume", 100), "Master Volume came back as %g in a host's session, not 100", s.get("master.volume"));
         }
+    }
+
+    // Master Volume is a level on the output: 64 unity, 12 dB down at 0 and up at 128 (#67). The same note on three
+    // fresh instances, so each renders the same samples before its level.
+    {
+        auto peakAt = [&](double vol) {
+            Rig s;
+            s.set("master.volume", vol);
+            s.run(4);
+            s.midi({0x90, 60, 100});
+            s.peak = 0;
+            s.run(20);
+            return (double)s.peak;
+        };
+        const double down = peakAt(0), unity = peakAt(64), up = peakAt(128);
+        CHECK(unity > 0 && std::fabs(20 * std::log10(up / unity) - 12) < 0.01 && std::fabs(20 * std::log10(down / unity) + 12) < 0.01,
+              "Master Volume 0 and 128 are %+.2f and %+.2f dB from 64, not -12 and +12", 20 * std::log10(down / unity), 20 * std::log10(up / unity));
     }
 
     // A library the instance cannot read says so on the status line, rather than every bank just vanishing:

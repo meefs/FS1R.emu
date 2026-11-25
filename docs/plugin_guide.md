@@ -35,7 +35,9 @@ The standalone's audio and MIDI settings are the last section of the **Options**
 
 ## The window
 
-The header is the unit's front panel: the performance's volume, the LCD, a pod of Save, Import, Editor and Keys buttons over the four part buttons, the Tone and KN knob modes and their four knobs, and the output monitor.
+The header is the unit's front panel: the Master Volume, the LCD, a pod of Save, Import, Editor and Keys buttons over the four part buttons, the Tone and KN knob modes and their four knobs, and the output monitor.
+
+- **Volume** is the Master Volume, FSVR's output level: 64 leaves it as the engine plays it, 0 takes it 12 dB down and 128 12 dB up. It is kept with the session in a host and with the standalone's state, and is no part of the performance, which has its own Volume on the Performance page.
 
 - **The LCD** shows the performance (click it for the factory performance menu; the arrows step through them), the selected part's voice and receive channel, the voices sounding (POLY) and the CPU. A user item shows as U and its number.
 - **Part 1 to 4** pick the part the edit pages show. Every part's params exist on their own, so a host automates a known part whichever is selected.

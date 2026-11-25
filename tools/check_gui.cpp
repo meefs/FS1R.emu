@@ -884,14 +884,25 @@ int main() {
             }
         }
 
-        // ---- sliders: the volume knob and Easy's attack fader drag, and a double-click resets ----------
+        // ---- sliders: the volume knob, Performance's Volume and Easy's attack fader drag, and a double-click resets -------
         {
             Rect r;
-            const double v0 = u.get("perf.volume");
+            // The top bar's knob is Master Volume, a level on the output and no part of the performance (#67).
+            const double m0 = u.get("master.volume");
+            u.set("gui.edited", 0);   // the sweep above edited the performance
+            u.run(10);
             if (u.rect("topbar/volume", r)) u.drag(r.x + r.w / 2, r.y + r.h / 2, 0, 40);
-            CHECK(u.get("perf.volume") < v0, "dragging Volume down left it at %g", u.get("perf.volume"));
-            CHECK(u.until([&] { return u.get("gui.edited") == 1; }), "an edit did not mark the performance edited");
+            CHECK(u.get("master.volume") < m0, "dragging the top bar's Volume down left Master Volume at %g", u.get("master.volume"));
+            u.run(10);
+            CHECK(u.get("gui.edited") == 0, "Master Volume marked the performance edited");
             if (u.rect("topbar/volume", r)) u.clickAt(r.x + r.w / 2, r.y + r.h / 2, true);
+            CHECK(u.get("master.volume") == 64, "a double-click did not reset Master Volume to 64 (%g)", u.get("master.volume"));
+            u.click("tab_performance");
+            const double v0 = u.get("perf.volume");
+            if (u.rect("pages/volume", r)) u.drag(r.x + r.w / 2, r.y + r.h / 2, 0, 40);
+            CHECK(u.get("perf.volume") < v0, "dragging Performance's Volume down left it at %g", u.get("perf.volume"));
+            CHECK(u.until([&] { return u.get("gui.edited") == 1; }), "an edit did not mark the performance edited");
+            if (u.rect("pages/volume", r)) u.clickAt(r.x + r.w / 2, r.y + r.h / 2, true);
             CHECK(u.get("perf.volume") == u.st->def((size_t)u.at("perf.volume")).def, "a double-click did not reset Volume (%g)", u.get("perf.volume"));
             u.click("tab_quick");
             if (u.rect("pages/attack", r)) u.drag(r.x + r.w / 2, r.y + r.h / 2, 0, -300);
