@@ -456,6 +456,19 @@ int selftest(Synth& S) {
       int again = -1; for (int i = 0; i < NCHAN; i++) if (T.ch[i].active && T.ch[i].held) again = i;
       ck("engine: a mono part's key-sync-off operator runs on through the gap", again == at && T.ch[at].op[0].phase == ph + inc * 4800u);
       T.midi_in(0x80, 60, 0); }
+    // #101: staccato on a long release. Poly lets each release ring on its own channel; mono takes the one
+    // channel back (FUN_000112c0), so its releases never stack.
+    for (int mono = 0; mono < 2; mono++) {
+      auto A = std::make_unique<Synth>(); Synth& T = *A; Voice& V = T.perf.part[0].voice; init_default_voice(V);
+      for (auto& o : V.v) o.T[3] = 99;                  // longest release
+      T.perf.part[0].p[5] = mono ? 0 : 1;
+      std::vector<float> a(2400), b(2400); int most = 0;
+      for (int n = 0; n < 8; n++) {
+        T.midi_in(0x90, 60 + n, 100); T.render(a.data(), b.data(), 2400);
+        T.midi_in(0x80, 60 + n, 0);   T.render(a.data(), b.data(), 2400);
+        most = std::max(most, T.active_chans()); }
+      if (mono) ck("engine: a mono part's staccato notes on a long release sound on one channel", most == 1);
+      else ck("engine: a poly part's staccato notes on a long release ring on together", most > 1); }
     { auto A = std::make_unique<Synth>(); Synth& T = *A; uint8_t perf[400]; T.current_perf_bytes(perf);
       perf_from_bytes(T, nullptr, perf);
       ck("engine: a performance load starts portamento from 0x53AA", T.perf.part[0].lastPitch == 0x53AA); }

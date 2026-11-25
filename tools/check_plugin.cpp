@@ -427,6 +427,25 @@ int main() {
     CHECK(a.until([&] { return a.get("fseq.position") > 5; }), "the Fseq playback position stayed at %g (speed %g, delay %g, part %g, mode %g, voices %d)", a.get("fseq.position"), a.get("fseq.speed"), a.get("fseq.delay"), a.get("fseq.part"), a.get("fseq.play_mode"), a.st->voices());
     a.midi({0x80, 60, 0});
 
+    // On MIDI clock it stands while the host is stopped and runs on the clock the transport makes once it plays (#108).
+    {
+        const double speed = a.get("fseq.speed");
+        a.set("fseq.speed", 0.2);   // MIDI 1/1, a frame a clock
+        a.proc->transport = {true, false, 120, 0};
+        a.run(2);
+        a.midi({0x90, 60, 100});
+        a.until([] { return false; }, 400);
+        const double still = a.get("fseq.position");
+        a.until([] { return false; }, 400);
+        CHECK(a.get("fseq.position") == still, "an Fseq on MIDI clock ran from %g to %g with the host stopped", still, a.get("fseq.position"));
+        a.proc->transport.playing = true;
+        CHECK(a.until([&] { a.proc->transport.beats += 512 / 48000.0 * 2; return a.get("fseq.position") > still + 5; }),
+              "an Fseq on MIDI clock stayed at %g while the host played (it stood at %g stopped)", a.get("fseq.position"), still);
+        a.midi({0x80, 60, 0});
+        a.proc->transport = {};
+        a.set("fseq.speed", speed);
+    }
+
     // Export writes a hardware-shaped dump.
     a.st->setData("sysex.export", (tmp / "out.syx").u8string());
     CHECK(a.until([&] { return fs::exists(tmp / "out.syx") && fs::file_size(tmp / "out.syx") > 3000; }), "Export SysEx wrote nothing");

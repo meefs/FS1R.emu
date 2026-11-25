@@ -210,6 +210,30 @@ static void dndSelection(PlatformWindow* w, const XSelectionEvent& s) {
     dndFinish(w, w->gui->drop(uriPaths(list)));
 }
 
+// The child of the root a window sits in, None if it cannot be walked (PointerRoot, None).
+static Window topOf(Display* dpy, Window win) {
+    if (win == None || win == PointerRoot) return None;
+    Window root = None, up = None, *kids = nullptr;
+    unsigned n = 0;
+    for (;;) {
+        if (!XQueryTree(dpy, win, &root, &up, &kids, &n)) return None;
+        if (kids) XFree(kids);
+        if (up == root || up == None) return win;
+        win = up;
+    }
+}
+
+// Whether focus left the window the editor is in. A GTK host (Reaper's) takes focus back to its own focus
+// window, in the same frame, each time the editor takes it, which closed a menu the click had just opened
+// (#113); the keyboard is the host's then, but the user has not gone anywhere.
+static bool focusLeft(PlatformWindow* w) {
+    Window f = None;
+    int revert = 0;
+    XGetInputFocus(w->dpy, &f, &revert);
+    const Window to = topOf(w->dpy, f);
+    return to == None || to != topOf(w->dpy, w->win);
+}
+
 static void event(PlatformWindow* w, XEvent& e) {
     Gui& g = *w->gui;
     const int s = g.scale();
@@ -284,7 +308,7 @@ static void event(PlatformWindow* w, XEvent& e) {
         break;
     }
     case FocusOut:
-        g.focusLost();
+        if (focusLeft(w)) g.focusLost();
         break;
     case ClientMessage:
         dndMessage(w, e.xclient);
