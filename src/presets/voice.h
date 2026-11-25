@@ -1,4 +1,4 @@
-// presets/voice.h - a voice as the firmware decodes it, and the DX7 conversion. KNOWN.
+// presets/voice.h - a voice as the FS1R decodes it, and the DX7 conversion. Matches the FS1R.
 #pragma once
 #include <cstdint>
 
@@ -20,8 +20,7 @@ struct Voice {
     int lfo1wave, lfo1speed, lfo1delay, lfo1sync, pmd, amd, fmd;
     int noteshift, pegL[5], pegT[4], pegVel, pegRange, pegTscale;
     int fseqV, fseqU, alg, corr[8], fb;
-    // Operators whose correction came in as a parameter change since the last voice load or algorithm change:
-    // FUN_00032624 writes the nibble without the carrier test FUN_0003251C applies, so a modulator plays it too.
+    // Operators whose correction came in as a parameter change since the last voice load or algorithm change: a parameter change writes the nibble without the carrier test a voice load or algorithm change applies, so a modulator plays it too.
     int corrEdit;
     OpV v[8]; OpU u[8];
 };

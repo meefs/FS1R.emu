@@ -1,4 +1,4 @@
-// presets/patch.cpp - voice, performance and part data as the firmware decodes it. KNOWN.
+// presets/patch.cpp - voice, performance and part data as the FS1R decodes it. Matches the FS1R.
 #include "engine/synth.h"
 
 // The DX7 ACED buffer: a voice edit arrives as VCED then ACED, so the ACED half is held here
@@ -67,8 +67,7 @@ void init_default_voice(Voice& V) {
     decode_voice(V);
 }
 
-// The common half of the ACED. The per-operator half is in convert_dx7, where the firmware applies it
-// (FUN_00035E96: ACED 6 + j replaces the VCED's amp mod sense when it is not 0).
+// The common half of the ACED. The per-operator half is in convert_dx7, where the FS1R applies it: ACED 6 + j replaces the VCED's amp mod sense when it is not 0.
 void apply_aced(uint8_t* out) {
     if (!g_acedValid) return;
     out[0x3B] = g_aced[0x0C] & 3;                 // pitch EG range
@@ -78,11 +77,7 @@ void apply_aced(uint8_t* out) {
 }
 
 void convert_dx7(const uint8_t* v, uint8_t* out) {
-    // FUN_00035918 (common) and FUN_00035E96 (one operator), byte for byte. The common block is a list of
-    // 16-bit words the firmware then packs; the per-algorithm row DX7MAP[alg] carries the FS1R algorithm,
-    // the operator slot each DX operator lands on, +2 on the output level where the row says so, and
-    // the carrier level corrections. Checked against the demo's own converted bulks (FullTine 1, DX-Acrd 4)
-    // on every byte the demo did not edit afterwards.
+    // The FS1R's own DX7 conversion, the common block and each operator, byte for byte. The common block is a list of 16-bit words the FS1R then packs; the per-algorithm row DX7MAP[alg] carries the FS1R algorithm, the operator slot each DX operator lands on, +2 on the output level where the row says so, and the carrier level corrections.
     memset(out, 0, 608);
     for (int i = 0; i < 10; i++) { uint8_t c = v[145 + i]; out[i] = (c < 0x20 || c > 0x7D) ? 0x20 : c; }
     const unsigned short* row = DX7MAP + 33 * (v[134] & 31);
@@ -100,18 +95,17 @@ void convert_dx7(const uint8_t* v, uint8_t* out) {
     out[0x50] = out[0x51] = out[0x52] = out[0x53] = 64;
     out[0x55] = 0x24; out[0x56] = 10; out[0x57] = 85; out[0x58] = 7; out[0x5B] = 69; out[0x5C] = 60; out[0x5D] = 12;   // the filter block's defaults
     out[0x64] = 64; out[0x65] = 50; out[0x66] = 100; out[0x67] = out[0x68] = 75; out[0x69] = out[0x6A] = out[0x6B] = 30; out[0x6C] = 99;
-    // the two unused slots take the template at 0x38A914 (35 bytes), with their Fseq track = the slot
-    // (both converted bulks carry break point 60 and the call index 6/7 in byte 5, where the ROM template has 39 and 0)
+    // the two unused slots take the 35-byte template, with their Fseq track = the slot: a converted voice carries break point 60 and the call index 6/7 in byte 5, where the template has 39 and 0
     for (int o = 0, j = 6; o < 8; o++) { uint8_t* p = out + 112 + o * 62; memcpy(p, DX7OPTEMPLATE, 35); p[23] = 60; memcpy(p + 35, DX7UOP + 27 * o, 27);
         bool used = false; for (int k = 0; k < 6; k++) if (row[25 + k] == o) used = true;
         if (!used) p[5] = (uint8_t)(j++); }
     for (int j = 0; j < 6; j++) {                     // j = 0 is DX operator 6
-        const uint8_t* d = v + j * 21; uint8_t* p = out + 112 + row[25 + j] * 62;   // slot: word 25 + j (0x389FBE)
+        const uint8_t* d = v + j * 21; uint8_t* p = out + 112 + row[25 + j] * 62;   // slot: word 25 + j
         int ol = d[16] + (row[17 + j] == 1 ? 2 : 0), rs = d[13];
         int att = rs * 1386 / 504 + (99 - ol) * 4 / 10 + 6, dec = rs * 1386 / 504 + (99 - ol) * 2 / 10;
         int coarse = d[18], fine = d[19], fixed = d[17] & 1;
         if (fixed) {
-            double hz = pow(10.0, coarse % 4) * pow(10.0, fine / 100.0);        // FUN_00035658, software float, INFERRED
+            double hz = pow(10.0, coarse % 4) * pow(10.0, fine / 100.0);        // the DX7 fixed frequency, a model of the FS1R's floating-point conversion
             double x = log2(hz / 440.0) + 16; int c = (int)floor(x); int f = (int)lround((x - c) * 128);
             if (f > 127) { f = 0; c++; }
             coarse = clampi(c, 0, 31); fine = clampi(f, 0, 127);

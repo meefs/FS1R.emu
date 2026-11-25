@@ -91,7 +91,7 @@ void wahDistortionWet(EffectHost& h, const uint16_t* wetSteps, int drive, int le
     h.storeDrive(drive, level, driveSteps);
     h.coef[mode[1]] = h.coef[mode[0]] = SQRT_HALF;
     if (mode2)
-        h.coef[mode2[1]] = h.coef[mode2[0]] = 0x5A81;      // one short of SQRT_HALF, as the firmware has it
+        h.coef[mode2[1]] = h.coef[mode2[0]] = 0x5A81;      // one short of SQRT_HALF, as the FS1R has it
     h.writeCoefs(2, mode);
     if (mode2)
         h.writeCoefs(2, mode2);
@@ -289,7 +289,7 @@ void EffectHost::touchWah(int w, int p)
         case SENSITIVITY: {
             coef[b.attack[0]] = P[SENSITIVITY] * 258;
             writeCoefs(1, b.attack);
-            [[fallthrough]];                        // the firmware runs on into the cutoff
+            [[fallthrough]];                        // the FS1R runs on into the cutoff
         }
         case CUTOFF: {
             coef[b.cutoff[0]] = wahCutoff(P[CUTOFF], 7837);
@@ -557,13 +557,13 @@ void EffectHost::wahDistortionDelay(int w, int p)
         case SENSITIVITY:
             coef[ins::WD_ATTACK[0]] = P[SENSITIVITY] * 258;
             writeCoefs(1, ins::WD_ATTACK);
-            [[fallthrough]];                        // the firmware runs on into the resonance
+            [[fallthrough]];                        // the FS1R runs on into the resonance
         case RESONANCE:
             coef[ins::WD_SENSE[0]] = wahSenseWord(P[RESONANCE]);
             writeCoefs(1, ins::WD_SENSE);
             break;
         case CUTOFF:
-            coef[ins::WD_CUTOFF[0]] = wahCutoff(P[CUTOFF], 7483);   // the firmware's own base for this wah
+            coef[ins::WD_CUTOFF[0]] = wahCutoff(P[CUTOFF], 7483);   // the FS1R's own base for this wah
             writeCoefs(1, ins::WD_CUTOFF);
             break;
         case RELEASE:

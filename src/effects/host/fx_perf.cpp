@@ -172,7 +172,7 @@ void EffectHost::applyChanges(uint32_t mask)
     }
 
     if (mask & MIXER_CHANGED) {
-        // The firmware clears the insertion flags here, and past the sixteenth the EQ's, never the mixer's.
+        // The FS1R clears the insertion flags here, and past the sixteenth the EQ's, never the mixer's.
         for (uint32_t i = 0; i < 21; i++) {
             if (mixerChanged[i] != 1)
                 continue;
@@ -404,8 +404,7 @@ void EffectHost::byteChanged(uint32_t id)
         case INDIVIDUAL_OUT:         mixer(MIX_INDIVIDUAL_OUT);         break;
     }
     if (n >= EQ_LOW_GAIN && n <= EQ_HIGH_SHAPE) {
-        // The firmware keeps ten EQ words where it uses eleven: the eleventh, the high band's
-        // shape, lands on the first two reverb flags and is read back from them.
+        // The FS1R keeps ten EQ words where it uses eleven: the eleventh, the high band's shape, lands on the first two reverb flags and is read back from them.
         const uint32_t i = n - EQ_LOW_GAIN;
         eqChanged[i] = 1;
         const int v = readParameter(n);

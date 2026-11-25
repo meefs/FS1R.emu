@@ -1,10 +1,4 @@
-// FSVR on Hollow: the FS1R engine (fs1rLib) behind the FSVR skin. The processor is a controller for
-// fsvr::Device and nothing more (AGENTS.md): every param is a sysex parameter change into the engine, as
-// the skin's data/fs1r_sysex.json addresses it, and what the engine holds comes back out of its own bulk
-// dumps. Around that sit the parts of the GUI the unit never had: the bank manager (factory banks and a
-// user library of .syx files, library.h, and its Save, Import and right-click menus), the morph square
-// (four corner voices per part, blended into the one voice the engine plays), Import Audio (audio_fseq.h)
-// and the output monitor.
+// FSVR on Hollow: the FS1R engine (fsvrLib) behind the FSVR skin. The processor is a controller for fsvr::Device and nothing more (AGENTS.md): every param is a sysex parameter change into the engine, as the skin's data/fs1r_sysex.json addresses it, and what the engine holds comes back out of its own bulk dumps. Around that sit the parts of the GUI the FS1R never had: the bank manager (factory banks and a user library of .syx files, library.h, and its Save, Import and right-click menus), the morph square (four corner voices per part, blended into the one voice the engine plays), Import Audio (audio_fseq.h) and the output monitor.
 //
 // Threads: the audio thread sends param changes and MIDI and renders; a worker loads patches, files and
 // libraries and brings what the engine did back into the params. ctl guards what both touch (the model of
@@ -13,7 +7,7 @@
 #include "core/core.h"
 #include "embedded_skin.h"
 #include "audio_fseq.h"
-#include "fs1r.h"
+#include "fsvr.h"
 #include "display/egview.h"
 #include "engine/tuning.h"
 #include "library.h"
@@ -210,9 +204,9 @@ static const bool kEgModels = [] {
             return out;
         };
     };
-    hollow::registerStageModel("fs1r.aeg", model(egview::AMP));
-    hollow::registerStageModel("fs1r.peg", model(egview::PITCH));
-    hollow::registerStageModel("fs1r.feg", model(egview::FILTER));
+    hollow::registerStageModel("fsvr.aeg", model(egview::AMP));
+    hollow::registerStageModel("fsvr.peg", model(egview::PITCH));
+    hollow::registerStageModel("fsvr.feg", model(egview::FILTER));
     return true;
 }();
 
@@ -499,8 +493,7 @@ private:
 
     // ---- to the engine ------------------------------------------------------------------------------
 
-    // dev_ is the unit's device number, its own or 16 for all: the one the engine has, which for a change of
-    // the device number itself is the old one, since the engine refuses a message addressed to the new.
+    // dev_ is the FS1R's device number, its own or 16 for all: the one the engine has, which for a change of the device number itself is the old one, since the engine refuses a message addressed to the new.
     void send(const Field& f, const uint8_t* bytes) { send(f, bytes, model.sys[0x49]); }
     void send(const Field& f, const uint8_t* bytes, int dev_) {
         const int v = f.wide ? bytes[f.off] << 7 | bytes[f.off + 1] : bytes[f.off];
@@ -666,9 +659,7 @@ private:
         dev.sendMidi(b, (size_t)n);
     }
 
-    // Program change as the unit takes it, out of the factory banks and the user library: on the
-    // performance channel in Performance mode a performance of the bank selected (Int = the user's), in
-    // Multi mode a voice for each part on the channel, from its bank.
+    // Program change as the FS1R takes it, out of the factory banks and the user library: on the performance channel in Performance mode a performance of the bank selected (Int = the user's), in Multi mode a voice for each part on the channel, from its bank.
     void programChange(int ch, int prog) {
         if (!model.sys[0x13]) return;              // program change receive off
         const int pc = perfChannel();
@@ -859,9 +850,7 @@ private:
         Model now;
         if (!now.parse(dump, &fseq)) return;
         showFseq(fseq);
-        // A part whose bank or number the host changed with no voice behind it: a performance bulk or parameter
-        // change, or a bank select. The unit loads that voice from its memory, and the engine only from an
-        // EPROM, which the plug-in has not got. The plug-in's own loads bring their voices themselves.
+        // A part whose bank or number the host changed with no voice behind it: a performance bulk or parameter change, or a bank select. The FS1R loads that voice from its memory, and the engine only from an EPROM, which the plug-in has not got. The plug-in's own loads bring their voices themselves.
         const int sent = fromHost ? hostVoices.exchange(0) : ~0;
         bool bare[4] = {};
         for (int p = 0; p < 4; ++p) {
@@ -997,10 +986,7 @@ private:
             if (moved(browseVoice[p]) && get(browseVoice[p]) >= 1) pick(1, (int)get(browseVoice[p]), p);
     }
 
-    // The Parts page's lamp turns a part off and on: off is voice bank off, as the unit has it, and the bank is
-    // kept with the session for on to bring back, with the voice it held. Bank off changes only the part's bank
-    // byte, so the engine still holds that voice, edits and all: on puts the byte back and nothing else. A part
-    // the lamp did not turn off (a performance or the host did) has no record, and on loads the bank's voice.
+    // The Parts page's lamp turns a part off and on: off is voice bank off, as the FS1R has it, and the bank is kept with the session for on to bring back, with the voice it held. Bank off changes only the part's bank byte, so the engine still holds that voice, edits and all: on puts the byte back and nothing else. A part the lamp did not turn off (a performance or the host did) has no record, and on loads the bank's voice.
     void lamp(int p) {
         const std::string key = "part.bank_was.p" + std::to_string(p + 1);
         const int b = (int)get(partBank[p]);
@@ -1138,10 +1124,7 @@ private:
         if (bank && perf.fseq >= 0) {
             const Item& f = bank->fseqs[(size_t)perf.fseq];
             dev.loadSyx(f.syx.data(), f.syx.size(), 0, 0);
-            // The engine's Fseq loader hands a performance with no Fseq part the first part, as a load from
-            // the Fseq page wants (chooseFseq). A saved preset's Fseq is the one the unit held when the
-            // performance was saved, so the performance's own part byte goes in again over it: with the
-            // part off, that Fseq's frame pitch was shifting every note on part 1 once the preset came back.
+            // The engine's Fseq loader hands a performance with no Fseq part the first part, as a load from the Fseq page wants (chooseFseq). A saved preset's Fseq is the one the engine held when the performance was saved, so the performance's own part byte goes in again over it: with the part off, that Fseq's frame pitch was shifting every note on part 1 once the preset came back.
             if (fseqPart >= 0) send(fields[(size_t)fseqPart], d);
         } else if ((d[0x15] & 7) != 0) {
             const int num = d[0x17];
@@ -1176,9 +1159,7 @@ private:
         syncBrowse();
     }
 
-    // Choosing an Fseq, as the unit's panel does, copies its header's loop points into the performance:
-    // the player reads the performance's pair and nothing else (FUN_0000FFFA, docs/ymp706_registers.md),
-    // so without the copy a new Fseq plays the loop the performance had, one frame when that was 0 to 0.
+    // Choosing an Fseq, as the FS1R's panel does, copies its header's loop points into the performance: the player reads the performance's pair and nothing else, so without the copy a new Fseq plays the loop the performance had, one frame when that was 0 to 0.
     // A performance's own load keeps its pair (followPerf loads its Fseq without this).
     void chooseFseq(const Item& f) {
         dev.loadSyx(f.syx.data(), f.syx.size(), 0, 0);
@@ -1376,7 +1357,7 @@ private:
         put(browseBank, k + 1);
         writeLists();
         std::string more;
-        if (made.size() > 1) more = ", and " + std::to_string(made.size() - 1) + " more as banks of their own";   // unit dumps
+        if (made.size() > 1) more = ", and " + std::to_string(made.size() - 1) + " more as banks of their own";   // FS1R dumps
         if (!err.empty()) more += " (" + err + ")";
         message("Imported \"" + b.name + "\": " + std::to_string(b.perfs.size()) + " performances, " + std::to_string(b.voices.size()) +
                 " voices, " + std::to_string(b.fseqs.size()) + " Fseqs" + more);
@@ -1396,7 +1377,7 @@ private:
         }
     }
 
-    // Export SysEx writes the whole unit: system, performance, its four voices and its Fseq.
+    // Export SysEx writes the whole FS1R: system, performance, its four voices and its Fseq.
     void exportSyx(const std::string& path) {
         std::vector<uint8_t> dump;
         {
@@ -1416,7 +1397,7 @@ private:
         return n;
     }
 
-    // Under ctl: the engine's performance, voices and Fseq as the unit dumps them, the performance named.
+    // Under ctl: the engine's performance, voices and Fseq as the FS1R dumps them, the performance named.
     std::vector<uint8_t> presetBytes(const std::string& name) {
         std::vector<uint8_t> dump, out;
         dev.getState(dump);
@@ -1425,7 +1406,7 @@ private:
             while (j < dump.size() && dump[j] != 0xF7) ++j;
             std::vector<uint8_t> m(dump.begin() + (long)i, dump.begin() + (long)std::min(j + 1, dump.size()));
             i = j + 1;
-            if (m[6] == 0x00) continue;   // the system is the unit's, not the preset's
+            if (m[6] == 0x00) continue;   // the system is the FS1R's, not the preset's
             if (m[6] == 0x10) {
                 Item perf;
                 perf.address = 0x10;
@@ -1437,7 +1418,7 @@ private:
         return out;
     }
 
-    // Under ctl: the engine's performance name and category, as the unit's parameter changes.
+    // Under ctl: the engine's performance name and category, as the FS1R's parameter changes.
     void setPerf(const std::string* name, int category) {
         for (int k = 0; name && k < 12; ++k) {
             const char c = k < (int)name->size() ? (*name)[(size_t)k] : ' ';
@@ -1558,8 +1539,7 @@ private:
         return o;
     }
 
-    // Export Preset: FSVR's own .fsvr, XML so it can carry more than the unit's bytes later on. Version 1
-    // holds the name, the category and the sysex a performance and its voices and Fseq load from.
+    // Export Preset: FSVR's own .fsvr, XML so it can carry more than the FS1R's bytes later on. Version 1 holds the name, the category and the sysex a performance and its voices and Fseq load from.
     void exportPreset(const std::string& path) {
         bool ok;
         {

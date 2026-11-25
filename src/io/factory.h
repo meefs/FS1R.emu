@@ -8,9 +8,9 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
-#include "fs1r.h"
+#include "fsvr.h"
 
-namespace fs1r_factory {
+namespace fsvr_factory {
 
 struct Blobs {
     std::vector<uint8_t> perfs, voices, fseqs;   // fs1r_performances.syx, fs1r_presets.syx, fs1r_fseqs.syx
@@ -79,4 +79,4 @@ inline bool performance(fsvr::Device& dev, const Blobs& b, int index) {
     return true;
 }
 
-}   // namespace fs1r_factory
+}   // namespace fsvr_factory

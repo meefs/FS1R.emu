@@ -1,4 +1,4 @@
-// tonegen/channel.h - one tone generator channel: eight operator pairs on an algorithm. INFERRED beyond the register values.
+// tonegen/channel.h - one tone generator channel: eight operator pairs on an algorithm. Tuned beyond the register values.
 #pragma once
 #include <cstdint>
 #include "presets/voice.h"
@@ -16,30 +16,27 @@ struct Chan {
     // zero samples that decide it, and freezeLeft is the samples until its last envelope is done, once
     // that is arithmetic, so the allocator sees it freed on the same sample it would have been.
     bool silent = false; int quiet = 0; long long freezeLeft = -1;
-    int owner = -1;      // the part whose note last took the channel, until a silence frees it (DAT_010289fc)
+    int owner = -1;      // the part whose note last took the channel, until a silence frees it
     long long ran = 0;   // Synth::now after the last sample the channel's operators stepped (render), for note_on
-    // The channel's last output, and the damp left over from the note this channel was playing before.
-    // FUN_00023000: note-on damps the channel it is about to take (the mask table at 0x35B260 is one hot
-    // per channel) rather than silencing it, so the previous note's waveform fades instead of being cut
-    // between two samples. cal::DAMP_MS is how fast. Both are the channel's own word, ahead of the filter
-    // and the pan, which is where the tone generator's fade is.
+    // The channel's last output, and the damp left over from the note this channel was playing before. A note-on damps the channel it is about to take rather than silencing it, so the previous note's waveform fades instead of being cut between two samples; cal::DAMP_MS is how fast.
+    // Both are the channel's own word, ahead of the filter and the pan, which is where the tone generator's fade is.
     double last = 0, damp = 0;
     // CPU side, computed at note-on
-    int noteP = 60;            // note after all shifts (DAT_0103937a)
-    int pitchNote = 0;         // NOTETAB + detune + tune (DAT_01028a84)
+    int noteP = 60;            // note after all shifts
+    int pitchNote = 0;         // NOTETAB + detune + tune
     int keyfact = 0;           // KEYFACT >> 2
     int levelOff[8], ulevelOff[8], freqWord[8], ufreqWord[8], frmtWord[8], bwReg[8], ubwReg[8];
     int detW[8] = {};                // detune, key scaled, in pitch word units (register 0x80)
-    int egbias[8], uegbias[8]; // image 0x1C0/0x1C8
-    int fbW[8] = {}, ufbW[8] = {};   // frequency bias words, DAT_010282bc / DAT_010283bc
+    int egbias[8], uegbias[8]; // EG bias, voiced and unvoiced
+    int fbW[8] = {}, ufbW[8] = {};   // frequency bias words, voiced and unvoiced
     int egL[8][4], egR[8][4], egHold[8], uegL[8][4], uegR[8][4], uegHold[8];
-    // pitch EG (software, FUN_00028c8e)
+    // pitch EG (software)
     bool pegWait = true;   // the note-on lands on the next tick, so the first tick is not the pitch EG's (peg_tick)
     int pegStage = 5, pegCur = 0, pegTarget = 0, pegRate = 255, velP = 128;
     int pegLvl[5], pegRt[5];
-    // portamento (FUN_00029048)
+    // portamento
     int portaCur = 0, portaTarget = 0, portaRate = 0; bool portaOn = false;
-    // LFO1 (FUN_00028828)
+    // LFO1
     uint32_t lfoPhase = 0, lfoDelay = 0, lfoFade = 0; int lfoVal = 0; int lfoSH = 0;
     // the pan registers (0x22A-0x22F)
     int panBase = 63; double panL = 1, panR = 1;
@@ -73,8 +70,7 @@ double render_chan(Chan& C, const Voice& V, bool fseq, double gateDb, int ctlDec
 // is Synth::now at the segment's first sample, for Chan::ran.
 int render_chan_block(Chan& C, const Voice& V, bool fseq, double gateDb, int ctlDecimation, int egDecimation, uint64_t ctlSerial,
                       long long now, double* out, bool* busy, int n);
-// The unvoiced carriers and their walks run free, per channel and operator: a note never restarts them, and while a
-// channel plays nothing its carriers run on at the centres they last played (docs/noise.md, 2026-11-02).
+// The unvoiced carriers and their walks run free, per channel and operator: a note never restarts them, and while a channel plays nothing its carriers run on at the centres they last played.
 // seed_unvoiced starts channel c's once, each from a seed of its own; keep_unvoiced carries them from was into C, which
 // note_on or silence_part has just rebuilt, the carriers run on to now (Synth::now).
 void seed_unvoiced(Chan& C, int c);

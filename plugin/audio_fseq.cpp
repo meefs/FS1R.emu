@@ -1,7 +1,7 @@
 // audioToFseq: fseq-flash's analysis (FormantDetector, PitchDetector, SpectralAnalysis) with the frame bytes
 // written on the engine's own scales (fsvr::Device::fseqWord, fseqLevel, fseqFrameSeconds).
 #include "audio_fseq.h"
-#include "fs1r.h"
+#include "fsvr.h"
 #include <algorithm>
 #include <cmath>
 #include <complex>

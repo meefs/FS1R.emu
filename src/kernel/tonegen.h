@@ -1,7 +1,7 @@
 // kernel/tonegen.h - the tone generator's lane kernel, chosen by the same instruction-set choice as the DSP's. Ours.
 //
 // The group kernel reads the tone generator's tables and the channel's control refresh, so it is the engine's
-// (fs1rLib), where the filter bank's kernel is the DSP library's (dispatch.h); dsp_check links the DSP alone.
+// (fsvrLib), where the filter bank's kernel is the DSP library's (dispatch.h); dsp_check links the DSP alone.
 // Both are compiled once per instruction set, and fsvr::isa() picks the same one for both.
 #pragma once
 #include "kernel/dispatch.h"

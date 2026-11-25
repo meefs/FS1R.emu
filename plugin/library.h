@@ -10,7 +10,7 @@ namespace fsvr {
 
 struct Item {
     std::string name;
-    int category = 0;              // the unit's category byte (performances and FS1R voices; DX voices have none)
+    int category = 0;              // the FS1R's category byte (performances and FS1R voices; DX voices have none)
     int address = 0;               // the bulk's address high: 0x10/0x11, 0x40..0x43/0x51, 0x60/0x61/0x70; 0 for a DX voice
     int number = -1;               // address low of an internal memory bulk (0x11, 0x51, 0x61), -1 otherwise
     int frames = 0;                // an Fseq's length in frames, as its header's end step gives it
@@ -64,9 +64,7 @@ public:
     // Copies a .syx into the folder as a new bank named after the file ("Name", "Name 2" ...) and rescans.
     // The new bank's index, or -1 (err says why).
     int import(const std::string& path, std::string& err);
-    // Several files as one new bank, named after their folder, each performance keeping the voices and Fseq
-    // that came with it. A file holding internal memory (a unit's dump, whose performances name their voices
-    // by number) is a bank of its own, as import() makes it, since its numbers would meet another file's.
+    // Several files as one new bank, named after their folder, each performance keeping the voices and Fseq that came with it. A file holding internal memory (an FS1R's dump, whose performances name their voices by number) is a bank of its own, as import() makes it, since its numbers would meet another file's.
     // The new banks' indexes, the shared one first; err says what could not be read.
     std::vector<int> importAll(const std::vector<std::string>& paths, std::string& err);
     // Writes bytes as a new bank called name (made unique the same way); its index, or -1.

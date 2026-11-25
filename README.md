@@ -2,7 +2,7 @@
 
 <h1 align="center">FSVR</h1>
 
-<p align="center"><b>A software recreation of the Yamaha FS1R synthesizer.</b><br>Created by studying the real hardware, specification, expired patents and firmware. Validated with tests against real hardware.</p>
+<p align="center"><b>A software recreation of the Yamaha FS1R synthesizer.</b><br>Rewritten in C++ and checked against real hardware.</p>
 
 <p align="center"><a href="../../releases/latest"><b>Download for Windows, Linux or MacOS</b></a></p>
 
@@ -18,15 +18,17 @@
 
 The Yamaha FS1R is one of the most sought-after FM synthesizers ever made, and one of the hardest to find.
 
-In 2025, Zhiyuan Wan ([rgwan](https://github.com/rgwan)) started taking a real FS1R apart to try and figure out how this masterpiece worked. After all, the FS1R is not analog, it is essentially a purpose built computer running primarily on a SuperH SH2 processor supported by DSP chips. Zhiyuan's work was picked up by James Hansen ([jameshansen](https://github.com/jameshansen)) in mid-2026 who used a custom AI-assisted tooling framework to begin to understand and rebuild the synthesizer in software - this is what became FSVR.
+In 2025, Zhiyuan Wan ([rgwan](https://github.com/rgwan)) started taking a real FS1R apart to try and figure out how this masterpiece worked. After all, the FS1R isn't analog, it's essentially a purpose built computer running on a SuperH SH-2 processor supported by DSP chips, and FSVR's sound is still checked against Zhiyuan's dumps and recordings of that unit.
 
-The biggest challenge was effects, which ran on a processor with minimal documentation. The [VOP3](https://github.com/musicastudio/VOP3) emulation core created by Wouter van Nifterick ([WouterVanNifterick](https://github.com/WouterVanNifterick)) gave us a reference point to finally understand and rewrite the FS1R's effects and filters in C++.
+In mid-2026, James Hansen ([jameshansen](https://github.com/jameshansen)) picked up Zhiyuan's work and used a custom AI-assisted tooling framework to understand the synthesizer and rebuild it in software, which is what became FSVR. We're open about how much AI has helped with this project - the first version of the engine was created with Claude Fable 5.1, and much of the analysis and engine work since has been done with the help of Claude Opus 5 and Opus 5.5.
 
-This project is not an emulation, it is a rewrite of the logic of the Yamaha FS1R in C++, so it runs natively on multiple platforms. We are transparent about how AI has also played a significant role in this project; the initial recreation was created using Claude Fable 5.1, with much of the ongoing analysis and engine improvements being assisted with Claude Opus 5 and Opus 5.5.
+The biggest challenge was the effects, which ran on a processor with very little documentation. The [VOP3](https://github.com/musicastudio/VOP3) emulation core built by Wouter van Nifterick ([WouterVanNifterick](https://github.com/WouterVanNifterick)) gave us a reference point to finally understand the FS1R's effects and filters and rewrite them in C++. Wouter has since contributed a lot more to FSVR, including the effect and filter hosts, polyphony up to 128 voices, the multi-lane rendering that keeps CPU use down, and fixes to the unvoiced operators.
 
-In addition to the synth engine, FSVR features a robust and friendly GUI that allows easy editing and creation of your own sounds.
+FSVR has had help from FS1R owners and plug-in developers too. Mario Kruselj ([mkruselj](https://github.com/mkruselj)) has tested FSVR side by side with a real FS1R and reworked the editor's pages, Dezzo ([dezzo](https://github.com/dezzo)) fixed the VST3 editor so Cubase keeps its edits, and DEE GROM ([PatriotBY](https://github.com/PatriotBY)) tracked down the clicks some formant sequences were making.
 
-We hope you enjoy.
+FSVR isn't an emulation, it's a rewrite of the FS1R's logic in C++, so it runs natively on Windows, macOS and Linux. Alongside the synth engine, FSVR has a friendly editor that makes it easy to edit the factory sounds and create your own.
+
+We hope you enjoy it. If you find a bug or make a sound you're proud of, come and tell us on the Discord.
 
 ## Demos
 
@@ -54,7 +56,7 @@ https://github.com/user-attachments/assets/db4cbe31-0bfa-451b-b8e1-563970ff559d
 
 The synthesis engine matches close to 1:1 with real hardware.
 
-A short list of places FSVR behaves differently **on purpose** is kept in [docs/Differences.md](docs/Differences.md), with the firmware address behind each one where there is one. Most are additions the unit never had: 32 filtered voices, 14-bit pitch bend, a gliding filter cutoff, user libraries without the unit's memory limits and Import Audio. `render_capture` keeps the engine's on the unit's behaviour unless given `-fsvr`.
+A short list of places FSVR behaves differently **on purpose** is kept in [docs/Differences.md](docs/Differences.md). Most are additions the FS1R never had: polyphony up to 128 voices, 32 filtered voices, 14-bit pitch bend, a gliding filter cutoff, user libraries without the FS1R's memory limits and Import Audio. `fsvr_render` keeps to the FS1R's behaviour unless given `-fsvr`.
 
 ## Builds
 
@@ -74,7 +76,7 @@ Each night `.github/workflows/nightly.yml` takes the newest build of `main` that
 CMake 3.24 or later everywhere, C++17. The engine, the console and the self checks need no dependencies:
 
 ```bash
-cmake -B build/cmake -S .                 # fs1rLib, bin/render_capture, and bin/fsvr_console on Windows
+cmake -B build/cmake -S .                 # fsvrLib, bin/fsvr_render, and bin/fsvr_console on Windows
 cmake --build build/cmake --config Release
 ctest --test-dir build/cmake -C Release   # the self checks
 ```
@@ -109,58 +111,59 @@ Everything meant to be run lands in `bin/`; objects and the test binaries go to 
 fsvr_console -l                                     list MIDI ports
 fsvr_console                                        asks for a MIDI input once, remembers it in bin\fsvr_console.ini
 fsvr_console -m 0 -o 0 -v presets\native\000_Ballad_EP.syx
-fsvr_console -v presets\dx7\004_Pianotone1.syx      DX7-format presets, converted the way the firmware does
+fsvr_console -v presets\dx7\004_Pianotone1.syx      DX7-format presets, converted as the FS1R converts them
 fsvr_console -r <eprom.bin> -p 128                  ROM voice, 0-255 native and 256-1407 the DX7 banks
 fsvr_console -r <eprom.bin> -P 0                    ROM performance 0-383 with its voices and Fseq
 fsvr_console -r <eprom.bin> -P 0 -f 29              override the Fseq with preset Fseq 1-90
 fsvr_console -v presets\native\128_BagPipe.syx -w test.wav -n 60 -d 3     offline render, no devices needed
 ```
 
-Options. `-m` MIDI input, `-o` MIDI output for dump and parameter replies, `-c` force all parts onto one MIDI channel (the default is each part on its own receive channel), `-v` a sysex file holding FS1R voice, performance or Fseq bulk dumps or a DX7 VCED dump, with `-p` picking the n-th dump in the file, `-r` a 2 MB EPROM image with `-p` voice, `-P` performance and `-f` Fseq, `-g` output gain, `-w` offline render with `-n` note, `-n2` a second note a third of the way in, `-cc num=val` control changes sent before the note, `-d` seconds, `-mono` part 1 mono with full-time portamento, `-selftest` the engine self check. `FS1R_DEBUG=1` prints the computed register values at every note on.
+Options. `-m` MIDI input, `-o` MIDI output for dump and parameter replies, `-c` force all parts onto one MIDI channel (the default is each part on its own receive channel), `-v` a sysex file holding FS1R voice, performance or Fseq bulk dumps or a DX7 VCED dump, with `-p` picking the n-th dump in the file, `-r` a 2 MB EPROM image with `-p` voice, `-P` performance and `-f` Fseq, `-g` output gain, `-w` offline render with `-n` note, `-n2` a second note a third of the way in, `-cc num=val` control changes sent before the note, `-d` seconds, `-mono` part 1 mono with full-time portamento, `-selftest` the engine self check. `FSVR_DEBUG=1` prints the computed register values at every note on.
 
 MIDI. Notes, bend, both aftertouches, the control numbers the system table assigns to KN1-4, MC1-4, FC, BC, Formant and FM, CC5/65 portamento, CC7 volume, CC10 pan, CC11 expression, CC64 sustain, CC91/94 sends, CC120/121/123/126/127, RPN 0-2, the ten NRPN 01 xx part parameters, bank select and program change in both performance and multi modes, MIDI clock, active sensing, FS1R bulk dumps and parameter changes across the whole map, and dump and parameter requests answered. The performance's controller sets route the sources to the destinations.
 
-The EPROM image the `-r` examples take is rgwan's dump with its 16-bit words byte-swapped into CPU order, kept outside this repo in `../FS1R_DISASM/roms/`. FSVR does not ship it, and nothing but the `-r` paths needs it.
+The `-r` examples take a 2 MB v1.20 EPROM image dumped from your own FS1R, with its 16-bit words byte-swapped into CPU order. FSVR doesn't include one, and nothing but the `-r` paths needs it.
 
 ### Checking a change
 
 ```bash
-python tools/check_wav.py test.wav 60   # pitch, harmonics and envelope of one render
-python tools/regress.py                 # the whole fixed preset list against the stored reference
+build.bat test                          # the engine self check, check_formant and check_presets
+python tests/check_wav.py test.wav 60   # pitch, harmonics and envelope of one render
+python tests/regress.py                 # the whole fixed preset list against the stored reference
 ```
+
+[AGENTS.md](AGENTS.md) has the full list of what to run before a change is done.
 
 ## Repo Layout
 
-**Engine.** No Windows, no host, no GUI. This is what the plugin links. The tree says where a claim comes from, which is the thing to know before changing anything in it.
-
-- `src/fs1r.h` the public header, `fsvr::Device`. The only one the plugin includes
-Each `src/` folder has a `README.md` with its files and rules; the summary:
+**Engine.** No Windows, no host, no GUI. This is what the plugin links, through `src/fsvr.h`, the public header and `fsvr::Device`, and the only header the plugin includes. Each `src/` folder has a `README.md` with its files and rules; the summary:
 
 `src/fs1r/` is the hardware's values and nothing else: what presets and the engine read, never code.
 
-- `hardware.h` the FS1R's own numbers, read off the board. Facts, never tuned
-- `tables.h` the EPROM's conversion tables, by `tools/extract_tables.py`; `algorithms.h` the 88-algorithm routing table
-- `rom_tables.h`, `rom_tables.cpp` the filter and effect hosts' EPROM tables, by `tools/extract_vop3_rom.py`
+- `hardware.h` the FS1R's own numbers, from the board. Facts, never tuned
+- `tables.h` the ROM's conversion tables, by `tools/extract_tables.py`; `algorithms.h` the 88-algorithm routing table
+- `rom_tables.h`, `rom_tables.cpp` the filter and effect hosts' ROM tables, by `tools/extract_vop3_rom.py`
 - `vop3_regs.h` the DSP registers the hosts write
-- `cal.h` the calibration surface, every modelled constant in one place: **INFERRED**, changed by measuring against a recording and never by taste
+- `cal.h` the calibration surface, every tuned constant in one place: **Tuned**, changed by measuring against a real FS1R and never by taste
 
-The engine, one folder a part. **KNOWN** parts are rewritten from the disassembly and cite a `FUN_` address; a disagreement with a real unit is a bug there, not a calibration. **INFERRED** parts are modelled, with their constants in `cal.h`.
+The engine, one folder a part. **Matches the FS1R** parts behave exactly as the FS1R does, so a difference from a real one is a bug there, not a calibration. **Tuned** parts are models, with their constants in `cal.h`.
 
-- `src/engine/` **KNOWN**: `synth.h` the engine's shared declarations, including `struct Synth`; `notes.cpp` note on and off, operator setup, pitch, portamento, and the 192.3 Hz tick; `controllers.cpp` the eight controller sets, the three scalers and the 48 destinations; `fseq.cpp` formant sequence playback; `midi.cpp` MIDI in and sysex in and out
-- `src/presets/` **KNOWN**: `patch.cpp` voice, performance and part data as the firmware decodes it, with the DX7 conversion; `rom.cpp` EPROM and sysex loading
-- `src/tonegen/` **INFERRED**: the tone generator. `operator.h` one operator's waveforms and grains, `envelope.h` its EGs, `noise.h` the unvoiced band, `channel.h` eight of them on an algorithm
+- `src/engine/` **Matches the FS1R**: `synth.h` the engine's shared declarations, including `struct Synth`; `notes.cpp` note on and off, operator setup, pitch, portamento, and the 192.3 Hz tick; `controllers.cpp` the eight controller sets, the three scalers and the 48 destinations; `fseq.cpp` formant sequence playback; `midi.cpp` MIDI in and sysex in and out
+- `src/presets/` **Matches the FS1R**: `patch.cpp` voice, performance and part data as the FS1R decodes it, with the DX7 conversion; `rom.cpp` ROM image and sysex loading
+- `src/tonegen/` **Tuned**: the tone generator. `operator.h` one operator's waveforms and grains, `envelope.h` its EGs, `noise.h` the unvoiced band, `channel.h` eight of them on an algorithm
 - `src/engine/render.cpp` the sample loop: channels, filter voices, part buses, effects
-- `src/modulators/` **INFERRED**: the EG generators and LFOs the filter and effect hosts program
-- `src/filters/` the voice filter: `voice_filter.h` one voice, `filter.h` 32 of them, `filter_host.*` the firmware's filter host
-- `src/effects/` the effects: `programs.h` their shared state and one file a program, `effects.h` the section, `host/` the firmware's effect host
-- `src/dsp/` what the filters and effects share: `word.h` the DSPs' number format, `sink.h` how a host talks to its section. `tools/dsp_check.cpp` pins the filters' and effects' output and `tools/dsp_bench.cpp` times it
+- `src/modulators/` **Tuned**: the EG generators and LFOs the filter and effect hosts program
+- `src/filters/` the voice filter: `voice_filter.h` one voice, `filter.h` 32 of them, `filter_host.*` the filter host
+- `src/effects/` the effects: `programs.h` their shared state and one file a program, `effects.h` the section, `host/` the effect host
+- `src/dsp/` what the filters and effects share: `word.h` the DSPs' number format, `sink.h` how a host talks to its section
 
 Ours, with no hardware counterpart:
 
 - `src/device/` `fsvr::Device`, host-rate resampling and state as bulk dumps
 - `src/math/` the sample loop's sine, 2^x and dB: a table (the default), CORDIC, a hybrid of the two, or raw libm, chosen by `FSVR_MATH`
+- `src/kernel/` the scalar code of the filters and the tone generator a few lanes at a time, compiled once per instruction set
 - `src/engine/tuning.h` cost knobs, the control-rate decimation and the queue cap. Changing one must not change the output
-- `src/display/` how the unit shows values (transcribed from K_Take's [FS1R Editor](https://synth-voice.sakura.ne.jp/fs1r_editor_english.html), checked against the Data List and the ROM) and the editor's EG plots
+- `src/display/` how the FS1R shows values (transcribed from K_Take's [FS1R Editor](https://synth-voice.sakura.ne.jp/fs1r_editor_english.html), checked against the Data List and the ROM) and the editor's EG plots
 - `src/io/smf.h` Standard MIDI File reading and offline rendering; `src/selftest/` the engine self check
 - `src/console/main.cpp` the test console: WinMM MIDI in and out, waveOut, offline render
 
@@ -170,48 +173,39 @@ Ours, with no hardware counterpart:
 - `plugin/library.cpp` the bank manager's data: .syx files as banks (FS1R bulks, DX7 single voices and 32-voice banks), the factory bank and the user library folder; `audio_decode.cpp` and `audio_fseq.cpp` Import Audio
 - `plugin/skin/` the editor, a [Hollow](hollow/) skin: views, params (`params.json`, 3,223 of them), images (at 1x in `images/`, at 0.5x, 0.75x, 1.5x and 2x in `scales/`) and its TrueType fonts, and `data/fs1r_sysex.json`, the address and packing of every param. This copy is the source: edit it with the web editor of the Hollow project (kept beside this repository, not published), which opens it by default and saves into it
 - `blender/` the skin's artwork as Blender components (the window's chrome, buttons, panels, displays, glyphs, logos, pots, faders, wheels and keys), `blender/scripts/` what builds and renders them into the skin at every scale, and `blender/textures/` the blue mottled chrome they share ([docs/editor.md](docs/editor.md), The art: Blender)
-- `plugin/generated/` the bundled factory banks `fs1r_presets.syx` with its index `fs1r_presets.csv`, `fs1r_performances.syx` and `fs1r_fseqs.syx`, packed from `presets/` by `tools/make_presets_blob.py`, and `parameterDescriptions_fs1r.json`, the 893 parameters with their sysex addresses and bit layouts, by `tools/gen_parameters.py`, which the skin's param table is built from
+- `plugin/generated/` the bundled factory banks `fs1r_presets.syx` with its index `fs1r_presets.csv`, `fs1r_performances.syx` and `fs1r_fseqs.syx`, packed from `presets/` by `tools/make_presets_blob.py`, and `parameterDescriptions_fs1r.json`, the 893 parameters with their sysex addresses and bit layouts, which the skin's param table was built from
 - `hollow/` the plug-in framework: the formats (CLAP, and through clap-wrapper VST3, AU and the standalone; VST2 and the DXi of its own), the skin runtime and software renderer, and the editor window on Windows, macOS and X11. [hollow/docs/skin-format.md](hollow/docs/skin-format.md) is the skin's contract
 
-**Tools, firmware.**
+**Tests.** What `build.bat test`, `build.bat plugin`, `ctest` and CI run.
 
-- `tools/build_fs1r_ghidra.py` imports and decompiles the firmware into `../FS1R_DISASM` with pyghidra (SH-2); `decomp.py`, `ghidra_disasm.py`, `ghidra_switches.py`, `ghidra_handlers.py` and `ghidra_probe.py` query it
-- `tools/ghidra_ctrl_dests.py` decompiles the 48 controller destination handlers, which Ghidra never turns into functions because only a pointer table reaches them
-- `tools/extract_tables.py`, `extract_presets.py` and `extract_demo.py` pull the conversion tables, the 1408 voices, 384 performances and 90 Fseqs, and the demo songs out of the EPROM image
-- `tools/extract_vop3_rom.py` writes the two hosts' EPROM tables, `src/fs1r/rom_tables.*`
+- `fsvr_console -selftest` (`tests/engine_selftest.cpp` away from Windows) is the engine check, the effects included: dry unity, Hall 1, the LFO law, the type path, a part on the insertion
+- `tests/dsp_check.cpp` pins the filters' and effects' output bit for bit
+- `tests/regress.py` renders the fixed preset list and diffs it against `regress_ref.json`: pitch, harmonic peaks, envelope, stereo width, centroid
+- `tests/abcheck.py` renders the regression cases and the Fat Line demo and compares them with a baseline sample for sample, which is the tier an optimisation commit names (`docs/performance.md`, Measuring). It loads the factory banks from `plugin/generated` (`-factory` on the renderers), so it needs no ROM image
+- `tests/check_plugin.cpp` drives the plug-in's processor the way a host does: factory banks, a saved session, Import SysEx, the bank browser, Import Audio, program change, panic, the monitor, Save to Bank, .fsvr presets, the right-click menus, and the Init Patch and the standalone's Load Last Patch. `ctest` runs it in a plug-in build
+- `tests/check_gui.cpp` drives the editor over the processor without a window, as a mouse and a keyboard would: the top bar's menus and toggles, every page by its tab or button, the operator panel and its waveform, the browser's right-click menus, every dialog, the modal's veil, Escape and close X, the close prompt, the Options page (every scale, both keyboards and each setting) and About, then every page's dials, faders, dropdowns and toggles. `ctest` runs it as "gui"
+- `tests/check_wav.py`, `check_formant.py` and `check_presets.py`, the rest of what `build.bat test` runs; `check_isa.py` keeps each lane kernel inside its instruction set and `check_win7.py` keeps every Windows binary loadable on Windows 7
 
-**Tools, calibration.**
+**Tools.**
 
-- `tools/make_capture_set.py` writes `captures/requests/`, the hardware capture kit: Standard MIDI Files that play a measurement into a real FS1R, each setting up its own patches by sysex and opening and closing with a marker so a recording aligns itself. Built out of `tools/fs1r_patch.py`; the other `make_capture_*.py` are the later additions to the set
-- `tools/analyze_capture.py` aligns a recording to the manifest, measures every segment, fits the constants it can, and diffs the result against our own render of the same file. `bin/render_capture` makes that render, which is also how a request file is checked before anyone is asked to play it. `tools/bench_captures.py` rebuilds the renderer from the source as it stands and prints one line per file; `tools/render_demo.sh` does the same for the demo set and appends to the ledger
-- `tools/render_song.py`, `check_demo.py` and `demo_probe.py` play the extracted demo songs through the engine and score them against rgwan's recording; `demo_scores.txt` is the running ledger
-- `tools/pitch_track.py`, `split_capture.py` and `analyze_unvoiced2.py` the per-measurement readers
-
-**Tools, checks.**
-
-- `tools/regress.py` renders the fixed preset list and diffs it against `regress_ref.json`: pitch, harmonic peaks, envelope, stereo width, centroid
-- `tools/perfbench.cpp` (`build.bat perf`) times the engine on fixed scenarios through `fsvr::Device`, pinned to one core, and hashes its 16-bit output; `tools/abcheck.py` renders the regression cases and the Fat Line demo and compares them with a baseline sample for sample, which is the tier an optimisation commit names (`docs/performance.md`, Measuring). Both load the factory banks from `plugin/generated` (`-factory` on the renderers), so neither needs the EPROM
-- `fsvr_console -selftest` (`engine_selftest` away from Windows) is the engine check, the effects included: dry unity, Hall 1, the LFO law, the type path, a part on the insertion. It runs under `ctest`
-- `tools/check_plugin.cpp` drives the plug-in's processor the way a host does: factory banks, a saved session, Import SysEx, the bank browser, Import Audio, program change, panic, the monitor, Save to Bank, .fsvr presets, the right-click menus, and the Init Patch and the standalone's Load Last Patch. `ctest` runs it in a plug-in build
-- `tools/check_gui.cpp` drives the editor over the processor without a window, as a mouse and a keyboard would: the top bar's menus and toggles, every page by its tab or button, the operator panel and its waveform, the browser's right-click menus, every dialog, the modal's veil, Escape and close X, the close prompt, the Options page (every scale, both keyboards and each setting) and About, then every page's dials, faders, dropdowns and toggles. `ctest` runs it as "gui"
-- `tools/check_wav.py`, `check_formant.py` and `check_presets.py`, the rest of what `build.bat test` runs; `check_skirt.py` renders every harmonic form at every skirt against the register sweep
+- `tools/fsvr_render.cpp` (`bin/fsvr_render`) renders a MIDI file or a held note offline on any platform; `render_song.py` renders a demo song to listen to
+- `tools/wavetrace.cpp` (`build.bat trace`) traces a voice's operators sample by sample ([AGENTS.md](AGENTS.md), Tracing a waveform)
+- `tools/perfbench.cpp` (`build.bat perf`) times the engine on fixed scenarios through `fsvr::Device`, pinned to one core, and hashes its 16-bit output; `tools/dsp_bench.cpp` (`build.bat bench`) times the filters and effects
+- `tools/patch.py` builds FS1R voices, performances, bulk dumps and Standard MIDI Files from Python, and `make_templates.py` writes the Templates bank with it; `pitch_track.py` prints a render's dominant frequency over time
+- `tools/make_presets_blob.py` packs `presets/` into `plugin/generated/`, `extract_bonus.py` writes `presets/bonus/` from the archived Bonus Tool Pack, and `contributors.py` writes the About box's contributor line
+- `tools/extract_tables.py`, `extract_presets.py`, `extract_demo.py` and `extract_vop3_rom.py` write the conversion tables, the factory banks, the demo songs and the hosts' tables from a ROM image you dump yourself
 
 **Data.**
 
-- `presets/` the factory voices, performances and Fseqs as `.syx` with `index.csv`, plus the DX7 bank
-- `captures/requests/` the capture kit as MIDI with a README listing what each file settles, `captures/hardware/` the recordings that came back, `captures/analysis/` the per-segment numbers, `captures/engine/` our own renders of the same files
+- `presets/` the factory voices, performances and Fseqs as `.syx` with `index.csv`, plus the DX7 bank and the Bonus Tool Pack
+- `demosongs/` the FS1R's fifteen demo songs as Standard MIDI Files, one a song and `all.mid` back to back, which `perfbench`, `abcheck` and `render_song.py` play
 
 **Docs.**
 
-- [docs/research.md](docs/research.md) what is known about the hardware, and [docs/ymp706_registers.md](docs/ymp706_registers.md) the tone generator interface and the CPU-side engine lifted from the firmware. These two are the reference.
-- [docs/fidelity_plan.md](docs/fidelity_plan.md) the ranked read of where the engine stands against every recording; `capture_0918.md` and `hardware_capture_request.md` are the capture working
-- `docs/aeg.md`, `formant.md`, `skirt.md`, `noise.md` and `detune.md`, one measurement each, the working behind the constants in `cal`
-- `docs/midi_dispatch.md` how a Note On, a Control Change and both aftertouches get from the SCI0 interrupt to the tone generator; `interface_from_firmware.md` the unit's screen tables, cursor stops and MIDI View, read out of the EPROM
-- [docs/Differences.md](docs/Differences.md) the short list of places FSVR knowingly behaves differently from the unit, and why
-- [docs/plugin_guide.md](docs/plugin_guide.md) the plugin user guide, and [docs/editor.md](docs/editor.md) why the editor is the way it is: which of the unit's limits it drops, the bank manager and what the processor answers for the GUI. The Data List and owner's manual text and the formant patent are here too.
+- [docs/Differences.md](docs/Differences.md) the short list of places FSVR knowingly behaves differently from the FS1R, and why
+- [docs/plugin_guide.md](docs/plugin_guide.md) the plugin user guide, and [docs/editor.md](docs/editor.md) why the editor is the way it is: which of the FS1R's limits it drops, the bank manager and what the processor answers for the GUI
+- [docs/performance.md](docs/performance.md) what the engine costs, and how a change to that cost is measured
 - [hollow/docs/](hollow/docs/) the plug-in framework: `framework.md` how a product is built on it, `skin-format.md` the skin's contract
-- [STATUS.md](STATUS.md) what is known, what is modelled and what nobody knows, with the open work at the end
-- [docs/findings.md](docs/findings.md) the research log, newest first, and the evidence behind each constant
 
 ## License
 

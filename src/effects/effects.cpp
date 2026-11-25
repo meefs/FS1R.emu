@@ -38,12 +38,7 @@ const Loadable INSERTION[] = {
 // (A073 R.P.M. into A072 Mouth Pop, insertion 24 into 15); the reverb delay's block fed a new echo a second
 // of the performance before it (A071 Relaxxx into A072).
 //
-// The cells are the ones the window's programs write and its clear program does not, less those every
-// window writes each sample (56-63, which are shared and always refreshed). The delay block is the span
-// EffectHost::clearWindow spreads the window's slots over, which is the firmware's own statement of which
-// block belongs to which window. It is a span of slot offsets, and a slot reads the ring from its pointer
-// (State::at), so the block's words are ptr + ram .. ptr + ramEnd. The reverb window has no clear program
-// and so no entry: its state lives in the base program, which every performance runs.
+// The cells are the ones the window's programs write and its clear program does not, less those every window writes each sample (56-63, which are shared and always refreshed). The delay block is the span EffectHost::clearWindow spreads the window's slots over, which is the FS1R's own statement of which block belongs to which window. It is a span of slot offsets, and a slot reads the ring from its pointer (State::at), so the block's words are ptr + ram .. ptr + ramEnd. The reverb window has no clear program and so no entry: its state lives in the base program, which every performance runs.
 struct Leftover { int cell, cells; uint32_t ram, ramEnd; };
 const Leftover LEFTOVER[5] = {
     {0, 0, 0, 0},                                                        // reverb: no clear program
@@ -90,13 +85,7 @@ void Effects::load(int window, int msb) {
         default: return;                         // aux has the one program
     }
     if (msb != vop3host::WINDOWS[window].clearEntry) return;
-    // The window is being reprogrammed, and the host has loaded the program that clears it
-    // (EffectHost::clearWindow). The clear program zeroes the window's registers and nothing else
-    // (ins_m14.cpp and the two others); the unit's chip runs it for as long as the upload takes, which is
-    // where the window loses them, but an upload costs no samples here, so run it once. The rest of the
-    // window's state, which no chip program can reach (LEFTOVER), goes first, since the clear program also reads
-    // its taps into the window's tap cells and should read them off an empty block. Together these are what
-    // make the new program start from silence instead of from the old one's state.
+    // The window is being reprogrammed, and the host has loaded the program that clears it (EffectHost::clearWindow). The clear program zeroes the window's registers and nothing else (ins_m14.cpp and the two others); the FS1R's chip runs it for as long as the upload takes, which is where the window loses them, but an upload costs no samples here, so run it once. The rest of the window's state, which no chip program can reach (LEFTOVER), goes first, since the clear program also reads its taps into the window's tap cells and should read them off an empty block. Together these are what make the new program start from silence instead of from the old one's state.
     const Leftover& left = LEFTOVER[window];
     std::fill_n(state.m + left.cell, left.cells, 0.0);
     for (uint32_t o = left.ram; o < left.ramEnd; o++) state.ram[(state.ptr + o) & (effects::State::RAM_WORDS - 1)] = 0.0;
@@ -112,11 +101,7 @@ void Effects::load(int window, int msb) {
 // take for their own, and the measured results were bursts to full scale into the overdrives, wahs and
 // echoes - the louder the better, since the state was loudest when something was playing.
 //
-// Clearing it costs the wet paths the time they take to refill, measured at about 30 ms to 90 % on a
-// reverb-heavy performance and nothing at all on the dry path, which reads as the effects fading in
-// rather than as a click. The firmware cannot do this: its clear programs reach a window's registers and
-// no more, and the chip has no instruction that writes delay memory. k[] and offset[] are the host's and
-// are not ours to touch; in[], lfo[] and out[] are rewritten every sample.
+// Clearing it costs the wet paths the time they take to refill, measured at about 30 ms to 90 % on a reverb-heavy performance and nothing at all on the dry path, which reads as the effects fading in rather than as a click. The FS1R cannot do this: its clear programs reach a window's registers and no more, and the chip has no instruction that writes delay memory. k[] and offset[] are the host's and are not ours to touch; in[], lfo[] and out[] are rewritten every sample.
 // The clearing leaves one thing behind: every mixer gain, return, pan and EQ word of the new performance
 // lands between one sample and the next, and a gain step on audio that is still sounding is a click of its
 // own, with nothing to do with what the programs carried. So the section fades in over FADE_SAMPLES.
@@ -159,13 +144,7 @@ void Effects::control(int dest, int offset) {
 // One sample. Serial channels k and k + 4 are the two halves of a frame and the left DAC plays channel 0, so a
 // bus's left goes to channel k + 4.
 //
-// The bus words land partway through the chip's pass, between steps 0x108 and 0x110 (VOP3.unlock
-// docs/vop3_isa.md, sessions 24-27: r0e tapped at 0x010 and at 0x110+ differs by one sample). So the base
-// program (0x000-0x0e7) and aux (0x0e8-0x10f) read the previous sample's words and the windows from 0x110 on
-// read this sample's. Writing them all before the base program put the right bus, which the base program
-// reads, one sample early against the left, which goes through the reverb delay window: the dry pair left
-// the DACs two samples apart. The unit's are one apart, left late, on every one of the 40 hardware takes, so
-// a mono sum notched at 12 kHz instead of at 24 kHz (FSVR#97).
+// The bus words land partway through the chip's pass, between steps 0x108 and 0x110. So the base program (0x000-0x0e7) and aux (0x0e8-0x10f) read the previous sample's words and the windows from 0x110 on read this sample's. Writing them all before the base program put the right bus, which the base program reads, one sample early against the left, which goes through the reverb delay window: the dry pair left the DACs two samples apart. The FS1R's are one apart, left late; two apart, a mono sum notched at 12 kHz instead of at 24 kHz (FSVR#97).
 void Effects::run(const double bus[8], double& l, double& r) {
     effects::State& s = state;
     mod.step();
@@ -178,12 +157,8 @@ void Effects::run(const double bus[8], double& l, double& r) {
     }
     for (int i = 2; i < 5; i++) if (stage[i]) stage[i](s);
     s.ptr = (s.ptr - 1) & (effects::State::RAM_WORDS - 1);
-    // The chip's words are fixed point and these are doubles, so a filter or a reverb that has decayed to nothing
-    // on the unit is a residue here, 1e-10 after a note, which the DAC's floor turned into -1 step for good. On the
-    // unit the output is digital zero after a note (FS1R.unlock 2026-10-26-*-silence, every idle segment). A value
-    // under 2^-24 of a register unit is finer than the LSB of a 32-bit word over +-128, so no word the chip holds
-    // can carry it: it is zero.
-    // ponytail: a bound, not the chip's word width (open, VOP3.unlock QBITS); model that width when it is measured.
+    // The chip's words are fixed point and these are doubles, so a filter or a reverb that has decayed to nothing on the FS1R is a residue here, 1e-10 after a note, which the DAC's floor turned into -1 step for good. On the FS1R the output is digital zero after a note. A value under 2^-24 of a register unit is finer than the LSB of a 32-bit word over +-128, so no word the chip holds can carry it: it is zero.
+    // ponytail: a bound, not the chip's word width, which is still open; model that width once it is known.
     auto chip = [](double v) { return std::fabs(v) < 0x1p-24 ? 0.0 : v; };
     l = fsvr::word::dac(chip(s.out[0])) / cal::WORD;
     r = fsvr::word::dac(chip(s.out[8])) / cal::WORD;

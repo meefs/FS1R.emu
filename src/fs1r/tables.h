@@ -30,7 +30,7 @@ static const unsigned short PEGTIME[100] = {
     11, 11, 10, 10, 9, 9, 8, 8, 7, 7, 6, 6, 5, 5, 4, 4,
     3, 3, 2, 1
 };
-// frequency EG level 0..100 -> 0..255, 128 = centre (registers 0x60/0x68, image +0x98/+0xA0). MEASURED against the voice images in FS1R.unlock/captures/2026-09-19
+// frequency EG level 0..100 -> 0..255, 128 = centre (registers 0x60/0x68)
 static const unsigned char FEGLVL[101] = {
     0, 16, 30, 42, 50, 54, 58, 62, 65, 68, 71, 74, 77, 79, 81, 83,
     85, 87, 89, 91, 93, 94, 96, 97, 99, 100, 102, 103, 105, 106, 108, 109,
@@ -336,7 +336,7 @@ static const unsigned char VNBAL[128] = {
     19, 19, 18, 17, 17, 16, 15, 15, 14, 14, 13, 12, 12, 11, 10, 10,
     9, 8, 8, 7, 7, 6, 5, 5, 4, 3, 3, 2, 1, 1, 0, 0
 };
-// pitch EG velocity sensitivity 0..7 -> multiplier (computed then overridden by the firmware)
+// pitch EG velocity sensitivity 0..7 -> multiplier (computed, then overridden by the FS1R)
 static const unsigned char PEGVEL[8] = {
     0, 19, 32, 52, 71, 90, 110, 129
 };
@@ -416,7 +416,7 @@ static const unsigned char VELCURVES[640] = {
     67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 80, 81, 82, 84,
     85, 87, 89, 91, 93, 96, 99, 103, 107, 111, 114, 117, 120, 123, 125, 127
 };
-// Fseq start delay 0..99 -> frames of the 7000-count CMT1 period (FUN_0001A560)
+// Fseq start delay 0..99 -> frames of the 7000-count CMT1 period
 static const unsigned short FSEQDLY[100] = {
     0, 3, 7, 10, 14, 17, 21, 24, 28, 31, 35, 38, 42, 45, 49, 52,
     56, 59, 63, 66, 70, 73, 77, 80, 84, 87, 91, 94, 98, 101, 105, 108,
@@ -426,7 +426,7 @@ static const unsigned short FSEQDLY[100] = {
     280, 283, 287, 290, 294, 297, 301, 304, 308, 311, 315, 318, 322, 325, 329, 332,
     336, 339, 343, 346
 };
-// DX7 -> FS1R conversion rows (FUN_00035918/E96): [alg][33]: 0..15 connection words with the carrier correction in t1 bits 3-6, 16 the FS1R algorithm, 17..22 +2 on the output level for DX ops 6..1, 23..24 unknown, 25..30 the FS1R operator each DX op 6..1 lands on, 31..32 unknown
+// DX7 -> FS1R conversion rows: [alg][33]: 0..15 connection words with the carrier correction in t1 bits 3-6, 16 the FS1R algorithm, 17..22 +2 on the output level for DX ops 6..1, 23..24 unknown, 25..30 the FS1R operator each DX op 6..1 lands on, 31..32 unknown
 static const unsigned short DX7MAP[1056] = {
     1, 3, 0, 1, 28, 0, 32, 0, 32, 0, 32, 25, 0, 0, 32, 25,
     8, 1, 1, 1, 0, 1, 0, 0, 0, 2, 3, 4, 5, 6, 7, 0,
@@ -522,13 +522,13 @@ static const unsigned short DX7CTRL[64] = {
     3, 6, 6, 5, 6, 2, 3, 5, 2, 5, 6, 2, 3, 0, 1, 0,
     1, 0, 3, 0, 1, 3, 3, 1, 2, 0, 5, 1, 5, 0, 5, 0
 };
-// DX7 -> FS1R: the voiced operator block of an unused slot (FUN_00035E96)
+// DX7 -> FS1R: the voiced operator block of an unused slot
 static const unsigned char DX7OPTEMPLATE[35] = {
     24, 1, 0, 0, 56, 0, 20, 15, 50, 50, 20, 20, 99, 99, 99, 0,
     0, 20, 20, 0, 0, 0, 0, 39, 0, 0, 3, 0, 0, 0, 0, 56,
     7, 7, 7
 };
-// DX7 -> FS1R: the unvoiced operator block per slot, 8 x 27 (FUN_00035E96)
+// DX7 -> FS1R: the unvoiced operator block per slot, 8 x 27
 static const unsigned char DX7UOP[216] = {
     24, 14, 0, 0, 20, 7, 0, 50, 50, 20, 20, 0, 7, 99, 99, 99,
     0, 0, 20, 20, 0, 0, 0, 7, 7, 7, 7, 24, 15, 0, 0, 20,

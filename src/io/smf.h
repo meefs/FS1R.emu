@@ -1,9 +1,6 @@
 // io/smf.h - Standard MIDI File reading, offline rendering and WAV writing, with no host in them.
 //
-// These were inside fs1r_console.cpp, which cannot build anywhere but Windows because the rest of it is
-// WinMM. The calibration loop needs the renders and nothing about a render is Windows-shaped, so they
-// live here and tools/render_capture.cpp is the portable front end. The console includes this too, so
-// there is still one copy of each.
+// Nothing about a render is Windows-shaped, so these are here rather than in the WinMM console and tools/fsvr_render.cpp is the portable front end. The console includes this too, so there is still one copy of each.
 #pragma once
 #include <algorithm>
 #include <cmath>
@@ -12,18 +9,17 @@
 #include <cstring>
 #include <string>
 #include <vector>
-#include "fs1r.h"
+#include "fsvr.h"
 
-namespace fs1r_smf {
+namespace fsvr_smf {
 
 static const int SR = (int)fsvr::ENGINE_RATE;
 
-// 16-bit for listening, 32-bit float for measuring: a render compared against a 24-bit capture must not
-// carry a quantisation floor of its own, and the quietest segments of the capture set sit below -100 dB.
+// 16-bit for listening, 32-bit float for measuring: a render that is measured must not carry a quantisation floor of its own.
 enum WavFormat { WAV_S16, WAV_F32 };
 
 // A sample as the 16-bit word a WAV holds: scaled to 32767, held to the range and cut toward zero. The one
-// quantiser every render goes through, so tools/perfbench.cpp and tools/abcheck.py hash the same bytes.
+// quantiser every render goes through, so tools/perfbench.cpp and tests/abcheck.py hash the same bytes.
 inline int16_t to_s16(float x) { return (int16_t)std::max(-32767.0f, std::min(32767.0f, x * 32767.f)); }
 
 inline void write_wav(const char* path, const std::vector<float>& l, const std::vector<float>& r,
@@ -59,9 +55,7 @@ inline void write_wav(const char* path, const std::vector<float>& l, const std::
 }
 
 // ------------------------------------------------------------------------------------------ MIDI file render
-// Plays a Standard MIDI File through the engine and writes the result, so the hardware capture requests
-// in captures/requests can be rendered by us and compared segment for segment with a recording of the
-// real unit. Types 0 and 1, all tracks merged, tempo changes followed.
+// Plays a Standard MIDI File through the engine and writes the result. Types 0 and 1, all tracks merged, tempo changes followed.
 struct SmfEvent { double t; std::vector<uint8_t> bytes; };
 
 inline bool read_smf(const char* path, std::vector<SmfEvent>& out) {
@@ -131,7 +125,7 @@ inline bool read_smf(const char* path, std::vector<SmfEvent>& out) {
 
 // One note, held for half the render, with an optional second note struck a third of the way in (mono
 // legato and portamento) and control changes sent before either. This is the console's -w path, and it
-// lives here rather than in console/main.cpp so the portable renderer can run it too: tools/regress.py
+// lives here rather than in console/main.cpp so the portable renderer can run it too: tests/regress.py
 // is the gate every engine change has to pass, and on a machine without the Windows console it could
 // not run at all.
 inline int render_note(fsvr::Device& dev, const char* path, int note, double secs, int note2,
@@ -180,4 +174,4 @@ inline int render_smf(fsvr::Device& dev, const char* smfPath, const char* wavPat
     return 0;
 }
 
-}   // namespace fs1r_smf
+}   // namespace fsvr_smf

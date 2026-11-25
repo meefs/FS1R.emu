@@ -1,6 +1,4 @@
-// display/display.h - how the FS1R shows what it holds: a fixed operator frequency in hertz, a voiced
-// operator's ratio and every effect parameter's value (hertz, milliseconds, the named choices). Ours:
-// a transcription for editors and displays, with no firmware counterpart. Nothing in the engine reads it.
+// display/display.h - how the FS1R shows what it holds: a fixed operator frequency in hertz, a voiced operator's ratio and every effect parameter's value (hertz, milliseconds, the named choices). Ours: a transcription for editors and displays. Nothing in the engine reads it.
 //
 // Transcribed from K_Take's FS1R Editor (freeware), https://synth-voice.sakura.ne.jp/fs1r_editor_english.html,
 // whose tables were read out of its Mac build 1.1.0 (2015); its Windows build 1.62 (2020) carries
@@ -11,10 +9,8 @@
 
 namespace display {
 
-// FIXED_FREQUENCY[fine][coarse - 1]: a fixed-mode operator's frequency as the unit shows it, for coarse
-// 1..21 and fine 0..127 (an unvoiced operator is always fixed); coarse 0 shows "0.000". One octave a
-// coarse step and 128 fine steps an octave: within 0.4% of 440.13 * 2^(coarse - 16 + fine / 128) Hz
-// above the lowest octaves, the rest of the difference being the unit's own rounding.
+// FIXED_FREQUENCY[fine][coarse - 1]: a fixed-mode operator's frequency as the FS1R shows it, for coarse 1..21 and fine 0..127 (an unvoiced operator is always fixed); coarse 0 shows "0.000".
+// One octave a coarse step and 128 fine steps an octave: within 0.4% of 440.13 * 2^(coarse - 16 + fine / 128) Hz above the lowest octaves, the rest of the difference being the FS1R's own rounding.
 inline constexpr const char* FIXED_FREQUENCY[128][21] = {
     {"0.013", "0.026", "0.053", "0.107", "0.215", "0.429", "0.859", "1.719", "3.439", "6.879", "13.75", "27.51", "55.03", "110.0", "220.1", "440.2", "880.5", "1761", "3522", "7044", "14088"},
     {"0.013", "0.027", "0.054", "0.108", "0.216", "0.432", "0.864", "1.729", "3.458", "6.916", "13.83", "27.66", "55.33", "110.6", "221.3", "442.6", "885.2", "1770", "3541", "7082", "14165"},
@@ -146,8 +142,7 @@ inline constexpr const char* FIXED_FREQUENCY[128][21] = {
     {"0.026", "0.053", "0.106", "0.213", "0.427", "0.855", "1.710", "3.420", "6.841", "13.68", "27.36", "54.73", "109.4", "218.9", "437.8", "875.7", "1751", "3503", "7006", "14012", "28024"},
 };
 
-// A voiced operator's ratio in ratio mode: coarse 0 is 0.5 + fine * 0.005 and coarse 1..31 is
-// coarse * (1 + fine / 100), 0.500 to 61.69. The unit shows three decimals below 10, two from 10.
+// A voiced operator's ratio in ratio mode: coarse 0 is 0.5 + fine * 0.005 and coarse 1..31 is coarse * (1 + fine / 100), 0.500 to 61.69. The FS1R shows three decimals below 10, two from 10.
 inline double ratio(int coarse, int fine) { return coarse == 0 ? 0.5 + fine * 0.005 : coarse * (1 + fine / 100.0); }
 
 // Effect parameter values. An effect slot names a value table; its sysex value v shows as

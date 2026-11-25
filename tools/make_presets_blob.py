@@ -7,7 +7,7 @@ presets/ holds the 1408 factory voices as one .syx per voice, pulled out of the 
 tools/extract_presets.py. The plugin has to be able to browse and load them with no EPROM in sight, so
 they are concatenated into one sysex stream and indexed by the flat voice number the engine already
 uses: 0-255 are the native voices (banks PrA and PrB), 256-1407 the DX7-format ones (PrC..PrK). That
-is the same numbering as bank_voice_index() in src/fs1r_lib.cpp, so a bank and program number pair
+is the same numbering as bank_voice_index() in src/presets/rom.cpp, so a bank and program number pair
 picks the same voice with or without the EPROM.
 
 The native dumps come out of the extractor addressed to part 1 (address high 0x40), which would pin

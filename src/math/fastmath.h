@@ -1,8 +1,6 @@
 // math/fastmath.h - the sample loop's transcendentals. Ours: the hardware has no opinion.
 //
-// Everything the per-sample path asks of libm goes through here: a sine by phase in turns, 2^x
-// and 10^(dB/20). FSVR_MATH picks how they are computed, and the rule is engine/tuning.h's: the
-// choice trades CPU for nothing else, so a backend that moves a measurement is wrong, not the unit.
+// Everything the per-sample path asks of libm goes through here: a sine by phase in turns, 2^x and 10^(dB/20). FSVR_MATH picks how they are computed, and the rule is engine/tuning.h's: the choice trades CPU for nothing else, so a backend that moves a measurement is wrong, not the FS1R.
 //
 //   FSVR_MATH=0  RAW     libm. Kept as the reference the others are checked against (fm::selfcheck)
 //                        and for A/B renders; not built by default.
@@ -16,11 +14,8 @@
 //                        starts at that step and needs fifteen steps instead of thirty, and it lands
 //                        within 1.2e-7 of libm where the plain table's interpolation is 3e-7.
 //
-// MEASURED 2026-09-28, docs/performance.md: on a desktop x86 the table is the fastest of the four by a
-// wide margin. Thirty seconds of A020 Vox Morph render in 1.9 s on LUT, 2.8 s on RAW, 6.8 s on HYBRID
-// and 9.0 s on CORDIC. A CORDIC step is a serial chain of shifts and adds, and fifteen of them cost
-// more than two loads and a multiply however the loop is written, so the hybrid is kept for a target
-// without a fast FPU rather than for this one.
+// On a desktop x86 the table is the fastest of the four by a wide margin (docs/performance.md). Thirty seconds of A020 Vox Morph render in 1.9 s on LUT, 2.8 s on RAW, 6.8 s on HYBRID and 9.0 s on CORDIC.
+// A CORDIC step is a serial chain of shifts and adds, and fifteen of them cost more than two loads and a multiply however the loop is written, so the hybrid is kept for a target without a fast FPU rather than for this one.
 //
 // The grain windows (g_win in tonegen/operator.cpp) are not here: they are a modelled waveform, not a
 // function anyone would compute another way. The control-rate maths (refresh_ctl, the EG rates, the

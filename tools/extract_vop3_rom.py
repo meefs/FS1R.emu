@@ -159,8 +159,7 @@ PRESETS = {
                         6: (0x360B7C, 0x3619F3, 0x3618D4), 7: (0x3656E0, 0x3657A8, 0x3657AC), 8: (0x360D0C, 0x3619F5, 0x361914),
                         9: (0x364B40, 0x364F3C, 0x3654CA), 10: (0x364CD0, 0x364F40, 0x36554A)}),
 }
-# The filter host's program and laws, in namespace flt: (name, address, element, count[, words a row]). The laws are
-# 128 long where the firmware indexes them with a byte as it came, whatever lies behind their last real entry.
+# The filter host's program and laws, in namespace flt: (name, address, element, count[, words a row]). The laws are 128 long where the FS1R indexes them with a byte as it came, whatever lies behind their last real entry.
 FILTER = [("CONSTANTS", 0x37541A, "u16", 512),
           ("CFG16", 0x37861A, "u8", 15), ("LFO2_SPEED", 0x374A04, "u16", 128), ("LFO2_PHASE", 0x374B04, "u16", 128),
           ("RESONANCE_A", 0x374B24, "u16", 128), ("RESONANCE_B", 0x374C24, "u16", 128), ("GAIN", 0x374D24, "u16", 128),
@@ -278,7 +277,7 @@ for window, (words, groups) in PRESETS.items():
         block_of, default_rows = [], []
         for lsb in range(lsbs[-1] + 1):
             if lsb not in lsbs: block_of.append(0); default_rows.append([0] * 16); continue
-            if window == "VARIATION" and msb == 7: a = blocks + ((s8(index + lsb) & 0xFFFF) * 200 & 0xFF)   # the firmware's own byte-wide product
+            if window == "VARIATION" and msb == 7: a = blocks + ((s8(index + lsb) & 0xFFFF) * 200 & 0xFF)   # the FS1R's own byte-wide product
             else: a = blocks + struct.unpack(">h", struct.pack(">H", u8(index + lsb) * words * 2 & 0xFFFF))[0]
             block_of.append(at.setdefault(a, len(at)))
             default_rows.append([u16(defaults + lsb * 32 + 2 * i) for i in range(16)])

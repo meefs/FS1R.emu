@@ -1,12 +1,8 @@
 // math/floor.h - floor as one instruction where the build or the CPU has it, else as an exact branchless cut. Ours.
 //
-// The sample loop takes a floor two or three times an operator. On the x64 baseline (SSE2) the library's floor
-// is a call that tests for SSE4.1 and rounds; the same test once, at load, and the rounding instruction inline
-// is a fifth faster, and every x86 since 2008 has it. Where it is missing, and on any other target without a
-// rounding instruction, the cut through an integer gives the same bits as std::floor for every double: a
-// magnitude at or past 2^52 is whole already (or not a number), under it the truncation is exact, and a zero is
-// returned as itself so a -0.0 stays one. Measured 2026-10-28: 1.1 ns the library, 0.9 ns roundsd, 1.1 ns the
-// cut; the cut with a branch on the sign instead of a select was 4 ns, mispredicting on modulated phases.
+// The sample loop takes a floor two or three times an operator. On the x64 baseline (SSE2) the library's floor is a call that tests for SSE4.1 and rounds; the same test once, at load, and the rounding instruction inline is a fifth faster, and every x86 since 2008 has it.
+// Where it is missing, and on any other target without a rounding instruction, the cut through an integer gives the same bits as std::floor for every double: a magnitude at or past 2^52 is whole already (or not a number), under it the truncation is exact, and a zero is returned as itself so a -0.0 stays one.
+// Timed, the library takes 1.1 ns, roundsd 0.9 ns and the cut 1.1 ns; the cut with a branch on the sign instead of a select was 4 ns, mispredicting on modulated phases.
 #pragma once
 #include <cmath>
 #include <cstdint>

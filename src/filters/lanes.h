@@ -23,7 +23,7 @@ struct Lanes {
     double type_k[N] = {};                                        // 0 for the six types, the type byte past them
     double reso_a[N] = {}, reso_b[N] = {};                        // the two resonance words
     double ramp[N] = {};                                          // the output ramp's step a sample
-    double glide[N] = {};                                         // ours: a one-pole on the cutoff word, 0 is the unit's step
+    double glide[N] = {};                                         // ours: a one-pole on the cutoff word, 0 is the FS1R's step
     double exp_slope[N] = {}, reso_bias[N] = {}, fb_scale[N] = {};   // the program's own constants
     double stage_k[N] = {}, damp_k[N] = {}, pole_k[N] = {};
     double route[N];                                              // the output's scale, x1 for the bandpass and x2 otherwise
@@ -40,7 +40,7 @@ struct Lanes {
     Lanes() {
         for (int s = 0; s < N; s++) {
             route[s] = 1; cutoff_s[s] = NAN; memo_fc[s] = NAN;
-            for (int t = 0; t < TAPS; t++) tap[t][s] = t == BPF ? ~0ull : 0;   // as the unit boots, before the host sets a type
+            for (int t = 0; t < TAPS; t++) tap[t][s] = t == BPF ? ~0ull : 0;   // as the FS1R boots, before the host sets a type
         }
     }
 };

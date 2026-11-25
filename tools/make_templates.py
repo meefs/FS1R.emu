@@ -5,11 +5,11 @@
 
 Each template is a performance with part 1 alone on the performance channel, dry, no filter, no Fseq,
 followed by its voice as a part 1 bulk (0x40), which is the shape Save to Bank writes, so the plug-in
-loads the voice with the performance. Built on tools/fs1r_patch.py's silent init voice and performance.
+loads the voice with the performance. Built on tools/patch.py's silent init voice and performance.
 """
 from pathlib import Path
 
-import fs1r_patch as fp
+import patch as fp
 
 OUT = Path(__file__).resolve().parent.parent / "presets" / "templates.syx"
 
@@ -18,9 +18,7 @@ OFF = (0, 0, 0, 0)
 
 
 def voice(name, alg=0, ops=(), **common):
-    """Every operator, voiced and noise, off unless named: output level 0 and EG levels 0. Output level 0 alone is
-    silent on the unit (the chip cuts an operator below about 89 dB, cal::OP_CUT_DB) and EG level 0 is off on any
-    tone generator, whatever level a controller or a bias adds back (docs/findings.md 2026-10-26)."""
+    """Every operator, voiced and noise, off unless named: output level 0 and EG levels 0. Output level 0 alone is silent on the FS1R (the chip cuts an operator below about 89 dB, cal::OP_CUT_DB) and EG level 0 is off on any tone generator, whatever level a controller or a bias adds back."""
     v = fp.init_voice(name.ljust(10))
     v[0x2C] = alg
     for k, val in common.items():

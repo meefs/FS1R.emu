@@ -1,15 +1,10 @@
 // engine/tuning.h - our own cost knobs. Nothing here is a fact about the FS1R.
 //
-// These are choices FSVR makes about how to spend CPU and memory. The hardware has no counterpart to
-// any of them, so none can be calibrated against a recording and none has a right answer to discover.
+// These are choices FSVR makes about how to spend CPU and memory. The hardware has no counterpart to any of them, so none can be calibrated against the FS1R and none has a right answer to discover.
 //
-// The rule that makes this file worth having: **changing a value here must not change the output.**
-// If it does, the value is too coarse and the number is wrong, not the hardware's. Tune these when
-// the engine is too slow. Never tune them to move a measurement, and never treat a disagreement with
-// a real unit as evidence about one of them.
+// The rule that makes this file worth having: **changing a value here must not change the output.** If it does, the value is too coarse and the number is wrong, not the hardware's. Tune these when the engine is too slow. Never tune them to move a measurement, and never treat a difference from the FS1R as evidence about one of them.
 //
-// Facts read off the board are in fs1r/hardware.h. Quantities measured off a real unit, which are
-// claims about the hardware and are changed only by measuring, are in fs1r/cal.h.
+// Facts about the board are in fs1r/hardware.h. The models' tuned constants, which are claims about the hardware, are in fs1r/cal.h.
 #pragma once
 #include <cstdint>
 #if defined(_M_X64) || defined(__x86_64__) || defined(_M_IX86) || defined(__i386__)

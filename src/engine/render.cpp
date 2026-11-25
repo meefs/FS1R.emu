@@ -84,13 +84,7 @@ void Synth::render_segment(float* outL, float* outR, int n, const Sends& s) {
 
 // The reference: a sample at a time throughout.
 void Synth::render_serial(float* outL, float* outR, int frames, const Sends& s) {
-    // Ours: an engine with nothing to play sleeps. Once no channel has been active and the output has held one
-    // value for a second, which is every reverb tail and filter ring-down gone under the DAC's last step, each
-    // block computes its first sample in full and repeats it for the rest, and wakes the moment that sample
-    // moves or a channel starts. An idle instance was 12 % of a desktop core (A001 Zap!, A020 Vox Morph), the
-    // effect section and the filter chip running on silence; asleep it is 1/256 of that. The unit runs its
-    // chips regardless. What sleeping changes is invisible at the output: the effect LFOs and the filter's
-    // modulators advance one sample a block rather than a block, so they come back at another phase.
+    // Ours: an engine with nothing to play sleeps. Once no channel has been active and the output has held one value for a second, which is every reverb tail and filter ring-down gone under the DAC's last step, each block computes its first sample in full and repeats it for the rest, and wakes the moment that sample moves or a channel starts. An idle instance was 12 % of a desktop core (A001 Zap!, A020 Vox Morph), the effect section and the filter chip running on silence; asleep it is 1/256 of that. The FS1R runs its chips regardless. What sleeping changes is invisible at the output: the effect LFOs and the filter's modulators advance one sample a block rather than a block, so they come back at another phase.
     bool skipping = false;
     for (int i = 0; i < frames; i++, now++) {
         if (asleep && i > 0) {

@@ -1,18 +1,13 @@
 // filters/voice_filter.h - one voice of the FS1R's filter: a resonant 4-pole ladder with taps. Ours.
 //
-// This is what the firmware's filter program computes for one voice, written as the DSP it is. The program
-// runs sixteen of these interleaved in one 512-step pass; nothing in it couples two voices, so here a
-// voice is a struct and a filter is as many of them as the engine wants (filters/filter.h). What runs is the lane
-// kernel (kernel/isa/bank_kernel.cpp), this voice's arithmetic W slots at a time; this is the reference it is
-// written from and read against, and dsp_check holds the two together.
+// This is what the FS1R's filter program computes for one voice, written as the DSP it is. The program runs sixteen of these interleaved in one 512-step pass; nothing in it couples two voices, so here a voice is a struct and a filter is as many of them as the engine wants (filters/filter.h). What runs is the lane kernel (kernel/isa/bank_kernel.cpp), this voice's arithmetic W slots at a time; this is the reference it is written from and read against, and dsp_check holds the two together.
 //
 // The arithmetic is the chip's, operation for operation, in its own number format: values are doubles
 // that a register wraps or saturates at +-128, a t register holds as a 1.15 word, and a cell clips at
 // +-128 (dsp/word.h). Keep every operation in this order, including the `+ 0.0`s, which the chip does
-// and which turn a -0 into +0: tools/dsp_check pins the result.
+// and which turn a -0 into +0: tests/dsp_check pins the result.
 //
-// The coefficients are the words the filter host writes (FilterHost, in the firmware's layout), as
-// fractions: k = int16(word) / 32768. Six of them are constants of the program the host never changes.
+// The coefficients are the words the filter host writes (FilterHost, in the FS1R's layout), as fractions: k = int16(word) / 32768. Six of them are constants of the program the host never changes.
 #pragma once
 
 #include <cmath>
@@ -34,12 +29,12 @@ struct VoiceFilter
 	double eg_depth = 0, lfo_depth = 0, cutoff = 0;   // the cutoff word and what moves it
 	double gain = 0;                                  // the input gain
 	double type_k = 0;                                // 0 for the six types, the type byte past them
-	double reso_a = 0, reso_b = 0;                    // the two resonance words (FUN_0000C3D0's tables A and B)
+	double reso_a = 0, reso_b = 0;                    // the two resonance words (the host's RESONANCE_A and RESONANCE_B tables)
 	double ramp = 0;                                  // the output ramp's step a sample: up while the note sounds
-	double glide = 0;                                 // ours: a one-pole on the cutoff word, 0 is the unit's step (docs/Differences.md)
+	double glide = 0;                                 // ours: a one-pole on the cutoff word, 0 is the FS1R's step (docs/Differences.md)
 	double exp_slope = 0, reso_bias = 0, fb_scale = 0;   // the program's own constants
 	double stage_k = 0, damp_k = 0, pole_k = 0;
-	Tap tap = BPF;                                    // as the unit boots, before the host sets a type
+	Tap tap = BPF;                                    // as the FS1R boots, before the host sets a type
 	double route = 1;                                 // the output's scale, x1 for the bandpass and x2 otherwise
 
 	// ---- the state ----

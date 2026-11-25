@@ -42,7 +42,7 @@
 #include <x86intrin.h>
 #endif
 #endif
-#include "fs1r.h"
+#include "fsvr.h"
 #include "io/factory.h"
 #include "io/smf.h"
 #include "engine/tuning.h"
@@ -58,7 +58,7 @@ struct Scenario { const char* name; int perf; Drive drive; int notes; double sec
                   int voice = -1;     // a factory voice (0..1407) loaded into every part, -1 for the performance's own
                   int filter = -1;    // every part's filter switch written 0 or 1, -1 for the performance's own
                   int poly = -1;      // every part's Mono/Poly byte written 0 or 1, -1 for the performance's own
-                  int chans = -1; };  // the polyphony (Device::setPolyphony: 32, 64, 96 or 128), -1 for the unit's 32
+                  int chans = -1; };  // the polyphony (Device::setPolyphony: 32, 64, 96 or 128), -1 for the FS1R's 32
 
 // Performances by their EPROM index: A001 Zap! 0, A014 Homy 13, A020 Vox Morph 19, A088 Fat Line 87,
 // B014 Full Tines 141, B053 Teck Hook 180. A chord is the first `notes` of CHORD; more than eight notes run up from 36.
@@ -96,8 +96,8 @@ const Scenario SCENARIOS[] = {
     {"held64-voxmorph-p128",   19,  HELD, 64, 10, nullptr,                      STANDARD, 0, -1,  -1, -1, 128},
     {"held32-superpad4-p128",  180, HELD, 32, 10, nullptr,                      FULL,     0, 108, 0,  1,  128},
     {"held32-superpad4f-p128", 180, HELD, 32, 10, nullptr,                      STANDARD, 0, 108, -1, 1,  128},
-    {"demo-fatline",      -1,  SMF,    0,  2,  "captures/demo/04_Fat Line.mid", STANDARD},
-    {"demo-all",          -1,  SMF,    0,  2,  "captures/demo/all.mid",         FULL},
+    {"demo-fatline",      -1,  SMF,    0,  2,  "demosongs/04_Fat Line.mid", STANDARD},
+    {"demo-all",          -1,  SMF,    0,  2,  "demosongs/all.mid",         FULL},
 };
 const int CHORD[8] = {48, 52, 55, 59, 62, 66, 69, 72};
 
@@ -112,8 +112,8 @@ bool phrase(const Scenario& s, const std::string& root, double override, std::ve
         for (double t = 0; t + 0.25 < secs; t += 0.5)
             for (int i = 0; i < s.notes; i++) { note(t, CHORD[i], true); note(t + 0.25, CHORD[i], false); }
     if (s.drive == SMF) {
-        std::vector<fs1r_smf::SmfEvent> smf;
-        if (!fs1r_smf::read_smf((root + "/" + s.smf).c_str(), smf)) return false;
+        std::vector<fsvr_smf::SmfEvent> smf;
+        if (!fsvr_smf::read_smf((root + "/" + s.smf).c_str(), smf)) return false;
         for (auto& e : smf) ev.push_back({e.t, e.bytes});
         secs = smf.back().t + s.secs;
     }
@@ -197,7 +197,7 @@ const uint64_t FNV_BASIS = 1469598103934665603ull, FNV_PRIME = 1099511628211ull;
 
 // The scenario through a fresh device: the phrase in blocks, the CPU time inside process() summed, the
 // output hashed and, when asked, kept.
-Run render(const Scenario& s, const std::vector<Event>& ev, double secs, const fs1r_factory::Blobs& b, const char* rom,
+Run render(const Scenario& s, const std::vector<Event>& ev, double secs, const fsvr_factory::Blobs& b, const char* rom,
            double rate, int speed, int block, bool keep) {
     fsvr::Device dev;
         if (rom && !dev.loadRom(rom)) { printf("cannot read %s\n", rom); exit(1); }
@@ -205,12 +205,12 @@ Run render(const Scenario& s, const std::vector<Event>& ev, double secs, const f
     dev.setSpeed(speed);
     if (s.chans > 0) dev.setPolyphony(s.chans);
     if (s.drive != SMF) dev.forceChannel(0);     // every part with a receive channel plays the chord
-    if (s.perf >= 0 && !(rom ? dev.loadRomPerformance(s.perf) : fs1r_factory::performance(dev, b, s.perf))) {
+    if (s.perf >= 0 && !(rom ? dev.loadRomPerformance(s.perf) : fsvr_factory::performance(dev, b, s.perf))) {
         printf("cannot load performance %d\n", s.perf); exit(1);
     }
     if (s.voice >= 0)
         for (int p = 0; p < 4; p++)
-            if (!(rom ? dev.loadRomVoice(p, s.voice) : fs1r_factory::voice(dev, b, p, s.voice))) { printf("cannot load voice %d\n", s.voice); exit(1); }
+            if (!(rom ? dev.loadRomVoice(p, s.voice) : fsvr_factory::voice(dev, b, p, s.voice))) { printf("cannot load voice %d\n", s.voice); exit(1); }
     if (s.poly >= 0)                             // part byte 5, Mono/Poly
         for (int p = 0; p < 4; p++) {
             const uint8_t m[10] = {0xF0, 0x43, 0x10, 0x5E, (uint8_t)(0x30 + p), 0, 5, 0, (uint8_t)s.poly, 0xF7};
@@ -241,7 +241,7 @@ Run render(const Scenario& s, const std::vector<Event>& ev, double secs, const f
         dev.process(l.data(), r.data(), n);
         run.cycles += cycles() - y0; run.cpu += cpu_seconds() - c0;
         for (int i = 0; i < n; i++) {
-            const int16_t a = fs1r_smf::to_s16(l[i]), c = fs1r_smf::to_s16(r[i]);
+            const int16_t a = fsvr_smf::to_s16(l[i]), c = fsvr_smf::to_s16(r[i]);
             const uint8_t bytes[4] = {(uint8_t)a, (uint8_t)(a >> 8), (uint8_t)c, (uint8_t)(c >> 8)};
             for (uint8_t x : bytes) h = (h ^ x) * FNV_PRIME;
             if (keep) { run.pcm.push_back(a); run.pcm.push_back(c); }
@@ -327,7 +327,7 @@ int main(int argc, char** argv) {
         else if (a == "--check-factory") checkFactory = true;
         else { usage(); return 1; }
     }
-    fs1r_factory::Blobs blobs;
+    fsvr_factory::Blobs blobs;
     if (!blobs.load(argv[0])) { printf("cannot find plugin/generated: run from the repository, or set FSVR_ROOT\n"); return 1; }
 
     // The scenarios asked for: a set, or names.
@@ -342,7 +342,7 @@ int main(int argc, char** argv) {
     if (list) {
         for (const Scenario& s : SCENARIOS) {
             fsvr::Device dev;
-            if (s.perf >= 0) fs1r_factory::performance(dev, blobs, s.perf);
+            if (s.perf >= 0) fsvr_factory::performance(dev, blobs, s.perf);
             printf("%-18s %s%-3d %-14s", s.name, s.perf >= 0 ? "perf " : "", s.perf, s.perf >= 0 ? dev.performanceName() : s.smf);
             if (s.drive == HELD) printf("  %d note%s held %g s", s.notes, s.notes > 1 ? "s" : "", s.secs);
             if (s.drive == STRUCK) printf("  %d notes every 0.5 s, %g s", s.notes, s.secs);

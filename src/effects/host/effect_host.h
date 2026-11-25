@@ -9,9 +9,7 @@
 #include "fs1r/rom_tables.h"
 #include "dsp/sink.h"
 
-// The arithmetic is the firmware's, bit for bit, as long as nothing is evaluated in a wider
-// type and a * b + c is not fused: build with -ffp-contract=off, or on MSVC with /fp:precise
-// (VS 2022 17.0 and later contract only under /fp:contract or /fp:fast; older ones need /fp:strict).
+// The arithmetic is the FS1R's, bit for bit, as long as nothing is evaluated in a wider type and a * b + c is not fused: build with -ffp-contract=off, or on MSVC with /fp:precise (VS 2022 17.0 and later contract only under /fp:contract or /fp:fast; older ones need /fp:strict).
 static_assert(FLT_EVAL_METHOD == 0, "the effect host needs float and double arithmetic without excess precision");
 
 namespace fsvr::vop3host {
@@ -92,7 +90,7 @@ extern const Window WINDOWS[5];
 struct Shelves { const uint16_t *low, *lowCopy, *high, *highCopy; int order = 1, highScale = 2; };
 
 struct EffectHost : ChipHost {
-    void init();                                                        // the chip and every window as the firmware starts them
+    void init();                                                        // the chip and every window as the FS1R starts them
     // A performance byte enters here: seven bits, and no effect type past the last one.
     void store(uint32_t index, uint32_t value)
     {
@@ -103,7 +101,7 @@ struct EffectHost : ChipHost {
         if (index == INSERTION_TYPE && value > 40) value = 40;
         perf[index] = uint8_t(value);
     }
-    // A performance's common bytes, loaded as the firmware loads a performance.
+    // A performance's common bytes, loaded as the FS1R loads a performance.
     void load(const uint8_t* bytes)
     {
         for (uint32_t i = 0; i < COMMON_BYTES; i++)
@@ -167,7 +165,7 @@ struct EffectHost : ChipHost {
     void setMixer(int m, uint32_t v);                                   // a mixer parameter, applied
     void setReverbPanReturn(bool delay, uint32_t pan, uint32_t ret);
     void copyEqParams();
-    // The firmware keeps ten EQ words where it uses eleven: the eleventh lies on the first two reverb flags.
+    // The FS1R keeps ten EQ words where it uses eleven: the eleventh lies on the first two reverb flags.
     int eqHighShape() const { return reverbChanged[0] << 8 | reverbChanged[1]; }
     void setInsertionSend(int to, uint32_t v);                          // to REVERB or VARIATION
     void setInsertionLevel(uint32_t v);

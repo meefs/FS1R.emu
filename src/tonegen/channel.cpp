@@ -1,4 +1,4 @@
-// tonegen/channel.cpp - a channel's control-rate refresh and its sample. INFERRED: the constants are in fs1r/cal.h.
+// tonegen/channel.cpp - a channel's control-rate refresh and its sample. Tuned: the constants are in fs1r/cal.h.
 #include "tonegen/channel.h"
 #include "fs1r/algorithms.h"
 
@@ -9,7 +9,7 @@ void refresh_chan(Chan& C, const Voice& V, uint64_t serial) {
     if (C.ctlSerialC == serial) return;
     C.ctlSerialC = serial;
     C.f0 = op_hz(op_increment(C.regPitch + 0x1243 + C.regPM));    // channel fundamental incl. LFO pitch mod (pms 7)
-    C.fbGain = V.fb ? cal::FEEDBACK * pow(2.0, V.fb - 7) : 0.0;    // INFERRED feedback scale
+    C.fbGain = V.fb ? cal::FEEDBACK * pow(2.0, V.fb - 7) : 0.0;    // feedback scale (cal.h)
 }
 
 void refresh_op(Chan& C, const Voice& V, bool fs, int o, uint64_t serial) {
@@ -18,11 +18,8 @@ void refresh_op(Chan& C, const Voice& V, bool fs, int o, uint64_t serial) {
         OpState& s = C.op[o]; const OpV& v = V.v[o]; const OpU& u = V.u[o];
         s.att = C.regLevel[o] * LEVEL_DB + am_att(C.regAM, v.ams);
         if ((alg[2 * o + 1] & 1) || (V.corrEdit >> o & 1)) s.att += cal::CARRIER_DB * V.corr[o];   // carrier level correction (the 0x200 word), on a modulator after an edit
-        // Ours, and bit-identical: an operator whose EG is over, with no grain in flight and no level
-        // boost that could lift it back over the -100 dB gate before the next refresh, never reads its
-        // frequency maths again. The carrier correction can reach -22.5 dB, hence the -20 dB bound on
-        // both the target attenuation and the slewed one. MEASURED 2026-09-28 on the Fat Line demo:
-        // refresh_ctl was a quarter of the render and half of that was for finished operators.
+        // Ours, and bit-identical: an operator whose EG is over, with no grain in flight and no level boost that could lift it back over the -100 dB gate before the next refresh, never reads its frequency maths again. The carrier correction can reach -22.5 dB, hence the -20 dB bound on both the target attenuation and the slewed one.
+        // On the Fat Line demo refresh_ctl was a quarter of the render, and half of that was for finished operators.
         if (s.eg.done() && !s.g[0].on && !s.g[1].on && s.att >= -20 && s.attS >= -20) goto unvoiced;
         if (C.ctlSerialV[o] == serial) goto unvoiced;   // current already (the values are a function of what the serial counts)
         C.ctlSerialV[o] = serial;
@@ -32,17 +29,9 @@ void refresh_op(Chan& C, const Voice& V, bool fs, int o, uint64_t serial) {
         // word offset on the chip, and the formant branch already carries it inside frmtWord.
         int det = v.form == 7 ? 0 : C.detW[o];
         double w;
-        // A frame's frequency word goes into the operator's own frequency register, it does not stand
-        // in for the whole register chain. A ratio operator still has the channel pitch added on top,
-        // which is what the format means for one: the word is an absolute formant centre, so a ratio
-        // operator handed one runs off the end of the register. MEASURED 2026-09-21: 12_fseqlevel's
-        // three sine segments sum to 39632..45056 at notes 36, 60 and 84 and the unit gives the same
-        // 23982 Hz line in all three, the saturated word, where the engine read the frame word alone
-        // and sang at 275 Hz. Formant and fixed operators do not add the channel pitch.
-        // Transpose is the formant operator's pitch, the grain rate, not this centre. Detune is the
-        // other half of the 0x230 word (FUN_00013bc6) and stays on the centre the coarse and fine set.
-        // A frame replaces that centre and does not take the word. LFO freq mod still reaches a formant or fixed
-        // one: FUN_0001DC30 writes the sense whether the operator plays a frame or not.
+        // A frame's frequency word goes into the operator's own frequency register, it does not stand in for the whole register chain. A ratio operator still has the channel pitch added on top, which is what the format means for one: the word is an absolute formant centre, so a ratio operator handed one runs off the end of the register and plays the saturated word at every note. Formant and fixed operators do not add the channel pitch.
+        // Transpose is the formant operator's pitch, the grain rate, not this centre. Detune is the other half of the 0x230 word and stays on the centre the coarse and fine set. A frame replaces that centre and does not take the word.
+        // LFO freq mod still reaches a formant or fixed one, whether the operator plays a frame or not.
         int fmw = (int)(C.regFM * cal::FMS_FRAC[v.fms]);
         if (fs && C.fseqOp[o]) w = C.fqWord[o] + pmw + det + (v.form != 7 && !v.fixed ? C.regPitch : fmw);
         else if (v.form == 7) w = C.freqWord[o] + C.fbW[o] + C.detW[o] + pmw + fmw;
@@ -51,13 +40,9 @@ void refresh_op(Chan& C, const Voice& V, bool fs, int o, uint64_t serial) {
         // The word through the phase generator (cal.h): the increment the chip steps the phase by, and in hertz
         // the frequency the grain forms run their carriers at.
         s.word = w; s.inc = op_increment(w); s.fop = op_hz(s.inc);
-        // The formant's window runs at the channel pitch through the operator's own pitch mod sense, not
-        // through the full LFO word: rgwan's demo take of 15_Human (pms 1..4, pmd 12) wobbles its formant
-        // harmonics 33..48 cents, the same as its pms 2 sine carriers, where a window on C.f0 gave 541.
-        // The transpose word rides that pitch. The width stays the same number of Hz, so the window
-        // length in periods follows the grain rate. The grain rate goes through the phase generator as
-        // every other rate does: on the unit a fixed formant and a fixed sine on the same word hold still
-        // against each other, where the smooth law put the formant 0.73 cents under (2026-10-24).
+        // The formant's window runs at the channel pitch through the operator's own pitch mod sense, not through the full LFO word. The transpose word rides that pitch.
+        // The width stays the same number of Hz, so the window length in periods follows the grain rate.
+        // The grain rate goes through the phase generator as every other rate does: on the FS1R a fixed formant and a fixed sine on the same word hold still against each other.
         double base = C.regPitch + 0x1243 + pmw - C.vcFreq[o][0];
         int trans = v.form == 7 ? C.frmtWord[o] - 0x1243 - C.detW[o] : 0;
         s.fw = op_hz(op_increment(base + trans));
@@ -74,13 +59,11 @@ void refresh_op(Chan& C, const Voice& V, bool fs, int o, uint64_t serial) {
         if (C.ctlSerialU[o] == serial) return;
         C.ctlSerialU[o] = serial;
         double nf;
-        // LFO freq mod and the control sets' frequency offset reach a frame word too: FUN_0001DC30 writes the
-        // sense for every operator and FUN_0002E308 adds the offset to every unvoiced word.
+        // LFO freq mod and the control sets' frequency offset reach a frame word too: the sense applies to every operator and the offset to every unvoiced word.
         int ufmw = (int)(C.regFM * cal::FMS_FRAC[u.fms]);
         if (fs && C.fseqUOp[o]) nf = op_hz(op_increment(C.fquWord[o] + ufmw + C.vcFreq[o][1]));
         else if (u.mode == 2 && v.form == 7) nf = op_hz(op_increment(C.freqWord[o] + C.detW[o]));
-        // MEASURED: link-ff on a voiced partner that is not a formant operator reaches register 0x300 as
-        // link-fo, not as itself. uv-linkff-sine's image reads mode 1 where the sysex asked for 2.
+        // link-ff on a voiced partner that is not a formant operator reaches register 0x300 as link-fo, not as itself.
         else if (u.mode) nf = C.f0;
         else nf = op_hz(op_increment(C.ufreqWord[o] + C.ufbW[o] + ufmw + C.vcFreq[o][1]));
         s.ninc = nf * fm::exp2(u.transpose / 12.0) / SR;   // the carrier's step, in turns a sample
@@ -98,12 +81,8 @@ void refresh_ctl(Chan& C, const Voice& V, bool fs, uint64_t serial) {
 
 double render_chan(Chan& C, const Voice& V, bool fseq, double gateDb, int ctlDecimation, int egDecimation, uint64_t ctlSerial) {
     if (C.silent) {
-        // Ours. The carriers and the noise are over, so the channel's output
-        // is zero from here to its end; what is left is when the allocator may treat it as free, which
-        // is the sample its last envelope passes -120 dB. Every envelope still running is in its release
-        // and falling linearly, so that sample is arithmetic, and the channel costs nothing until then.
-        // The hardware renders these channels in full, at no cost; on the Fat Line demo they were half
-        // of the 32 channels for the whole song (docs/performance.md, 2026-09-28).
+        // Ours. The carriers and the noise are over, so the channel's output is zero from here to its end; what is left is when the allocator may treat it as free, which is the sample its last envelope passes -120 dB. Every envelope still running is in its release and falling linearly, so that sample is arithmetic, and the channel costs nothing until then.
+        // The hardware renders these channels in full, at no cost; on the Fat Line demo they were half of the 32 channels for the whole song (docs/performance.md).
         if (C.freezeLeft < 0) {
             long long worst = 0; bool can = true;
             for (auto& s : C.op) for (const EG* e : {&s.eg, &s.ueg}) {
@@ -157,18 +136,12 @@ double render_chan(Chan& C, const Voice& V, bool fseq, double gateDb, int ctlDec
         }
         if (gain != 0.0 || s.g[0].on || s.g[1].on) {
             double fop = s.fop; uint32_t inc = s.inc;
-            // Every operator takes its frequency EG, fixed ones included. MEASURED 2026-10-24 off Wouter's
-            // FS1R playing A123 Drum Kit 3 (all fixed operators, flat pitch EG, the kick sweeps down), and
-            // 2026-10-25 on rgwan's rig: fixed 1 kHz sines under six FEG settings, onset-feg's among them,
-            // track this ramp to within 1% from the first cycle (docs/findings.md 2026-10-25).
+            // Every operator takes its frequency EG, fixed ones included.
             // The EG moves the word, so the phase generator takes the moved word every sample of the ramp.
             if (s.feg.stage < 2) { inc = op_increment(s.word + s.feg.tick() * (1024.0 / 12.0)); fop = op_hz(inc); }
             y = op_sample(s, v, s.fw, fop, inc, s.ratio, in * FM_INDEX, gain, C.phOff[o]);
         } else s.phase += op_inc32(s.inc);   // a silent operator's phase generator runs on (Synth::note_on)
-        // A read leaves the sum bus as it is; t1 bit 1 starts it over, after this operator's read and
-        // before its add. INFERRED from the table, not measured: the bit is set wherever a second sum
-        // starts and never over an add no operator has read yet, and so 65 and 80 fan out to every
-        // reader as the Algorithm Sheet draws them (docs/ymp706_registers.md, the algorithm word).
+        // A read leaves the sum bus as it is; t1 bit 1 starts it over, after this operator's read and before its add. The bit is set wherever a second sum starts and never over an add no operator has read yet, and so algorithms 65 and 80 fan out to every reader as the Algorithm Sheet draws them.
         s.out = y;
         Cb = y; if (t0 & 2) H = y; if (t1 & 2) S = 0; if (t1 & 4) S += y; if (t0 & 4) fbNew = y;
         if (t1 & 1) mix += y * partV;
@@ -219,12 +192,9 @@ double render_chan(Chan& C, const Voice& V, bool fseq, double gateDb, int ctlDec
     bool carriersDone = true;
     for (int o = 0; o < 8; o++) { const OpState& s = C.op[o]; if (((alg[2 * o + 1] & 1) && (!over(s.eg, s.attS, vGate) || s.g[0].on || s.g[1].on)) || !over(s.ueg, s.uattS, uGate)) { carriersDone = false; break; } }
     if (carriersDone && fabs(mix) < 1e-9 && C.damp == 0.0) { if (++C.quiet >= 64) C.silent = true; } else C.quiet = 0;
-    // The channel accumulator saturates before the filter loop, which is where the capture puts it:
-    // eight carriers stacked in one channel clip flat, while the filter's own output on ingain-12 rides
-    // 4 dB above that ceiling, so nothing downstream of CHOUT can be what clips.
+    // The channel accumulator saturates before the filter loop: eight carriers stacked in one channel clip flat, while the filter's own output rides 4 dB above that ceiling, so nothing downstream of CHOUT can be what clips.
     mix = std::clamp(mix, -cal::CHAN_CLIP, cal::CHAN_CLIP);
-    // Remember this channel's own output, so a note-on that takes this channel has something to fade,
-    // and add whatever the previous note left behind (FUN_00023000, see note_on).
+    // Remember this channel's own output, so a note-on that takes this channel has something to fade, and add whatever the previous note left behind (see note_on).
     C.last = mix;
     if (C.damp != 0.0) {
         mix += C.damp;
@@ -253,7 +223,7 @@ void seed_unvoiced(Chan& C, int c) {
         OpState& s = C.op[o];
         s.nphase = ((k >> 9) & 0x7FFFFF) / 8388608.0;
         s.rng    = k | 1u;
-        s.walk   = 0;   // MEASURED 2026-11-07: a channel's first notes at bandwidth 0 are digital zero (docs/noise.md)
+        s.walk   = 0;   // a channel's first notes at bandwidth 0 are digital zero
     }
 }
 

@@ -38,8 +38,7 @@ uint16_t Modulators::read(uint32_t reg) const
 // crosses its target.
 // OPEN: when a segment arms. Here the target write arms it and the level moves whenever the rate lets it,
 // so a segment whose rate is written last starts as well.
-// OPEN: a segment armed within two units of its target ends after cal::FEG_FLAT_S whatever its rate.
-// That is what the unit was measured to do. How it does it is not known.
+// OPEN: a segment armed within two units of its target ends after cal::FEG_FLAT_S whatever its rate, as on the FS1R; how the FS1R does it is not known.
 void Modulators::egWrite(int n, uint32_t reg, uint16_t v)
 {
     Eg& g = eg[n];
@@ -65,11 +64,7 @@ float Modulators::lfo(int n) const
     const uint16_t* reg = lfoReg[n];
     const float x = (float)phase[n] * (1.0f / 4294967296.0f);
     float v;
-    // One rule for the filters and the effects. LFO_WAVE bit 12 picks the range: clear, the saws and the triangle
-    // are unipolar 0..1 and LFO_DIRECTION 0x8000 centres them (the effects: an LFO measured on the unit reads
-    // 0..+128, 2WayRotary's with direction 0xC000 -64..+64); set, they are bipolar -1..1 and 0x4000 halves (the
-    // filter, whose host boots every LFO_WAVE to 0x1000: 20_fltmod's LFO2 envelopes, 6.1 dB, against 12.7 dB read
-    // unipolar). Square, sine and S&H, which nothing measured uses, stay -1..1.
+    // One rule for the filters and the effects. LFO_WAVE bit 12 picks the range: clear, the saws and the triangle are unipolar 0..1 and LFO_DIRECTION 0x8000 centres them (the effects: an effect LFO on the FS1R reads 0..+128, 2WayRotary's with direction 0xC000 -64..+64); set, they are bipolar -1..1 and 0x4000 halves (the filter, whose host boots every LFO_WAVE to 0x1000). Square, sine and S&H stay -1..1; their range is not confirmed.
     // OPEN: 0x4000 without bit 12, 0x8000 with it; the quarter-cycle between the two triangles.
     const bool bipolar = reg[1] & 0x1000;
     switch ((reg[1] >> 5) & 7) {
@@ -87,9 +82,9 @@ float Modulators::lfo(int n) const
 }
 
 // One sample of every EG and LFO.
-// The speed word is 10 bits, cycles per sample * 2^20 (the effects modulate at the Data List's LFO Freq, measured).
+// The speed word is 10 bits, cycles per sample * 2^20 (the effects modulate at the Data List's LFO Freq).
 // A full LFO fills a register at 128.
-// OPEN: the EGs step once a sample here; the unit's own step rate is not known.
+// OPEN: the EGs step once a sample here; the FS1R's own step rate is not known.
 void Modulators::step()
 {
     for (int n = 0; n < 16; n++) {

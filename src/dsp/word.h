@@ -1,9 +1,8 @@
 // dsp/word.h - the FS1R DSP's number format, shared by the filters and the effects. Ours.
 //
-// Values are doubles in register units: a register wraps or saturates at +-128, the running sum wraps at
-// +-256, a cell clips at +-128, a delay RAM word at +-32 and a t register holds a 1.15 word. These are the
-// operations the unit's DSP applies, by name; a filter or effect built from them in the unit's order is bit for
-// bit the unit. Keep the `+ 0.0`s: they turn a -0 into +0, as the unit does.
+// Values are doubles in register units: a register wraps or saturates at +-128, the running sum wraps at +-256, a cell clips at +-128, a delay RAM word at +-32 and a t register holds a 1.15 word.
+// These are the operations the FS1R's DSP applies, by name; a filter or effect built from them in the FS1R's order computes exactly what the FS1R does.
+// Keep the `+ 0.0`s: they turn a -0 into +0, as the FS1R does.
 #pragma once
 
 #include <algorithm>
@@ -19,7 +18,7 @@ inline double floored_mod(double a, double m)
 	if (v != 0 && ((m < 0) != (v < 0))) v += m;
 	return v;
 }
-// Wraps add and take back the range rather than testing it, which is how the chip was measured to round.
+// Wraps add and take back the range rather than testing it, which is how the chip rounds.
 inline double wrap_in(double y, double half)
 {
 	double const a = y + half;
@@ -45,7 +44,7 @@ inline double q15(double y)
 inline double frac(double y) { double const w = y * 256.0; return w - fm::floor_exact(w); }
 inline double index(double y) { return fm::floor_exact(y * 256.0); }   // a delay index, in samples
 
-// The DAC word the unit plays for a cell value: floor to 18 bits of value / 4, clipped at +-8. Full scale is 8.
+// The DAC word the FS1R plays for a cell value: floor to 18 bits of value / 4, clipped at +-8. Full scale is 8.
 inline double dac(double v) { return fm::floor_exact(std::clamp(v / 4.0, -8.0, 8.0) * 16384.0) / 16384.0; }
 
 // A run of products into the running sum, in the order the chip adds them: sum(a, b, c) is

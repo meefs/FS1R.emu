@@ -9,15 +9,11 @@ namespace {
 using fsvr::filters::Lanes;
 namespace word = fsvr::word;
 
-// OPEN: the level a channel reaches the filter at. A channel at its clip level is taken to be a full-scale
-// serial word. What comes back is scaled so that the passband loses cal::FLT_LOSS, as measured on the unit.
+// OPEN: the level a channel reaches the filter at. A channel at its clip level is taken to be a full-scale serial word. What comes back is scaled so that the passband loses cal::FLT_LOSS, as the FS1R's does.
 const double TO_FILTER = cal::WORD / cal::CHAN_CLIP;
 const double FROM_FILTER = cal::CHAN_CLIP * cal::FLT_LOSS / cal::WORD;
 
-// The unit's serial schedule. The chip runs sixteen voices in four pages over one pass and moves each voice's
-// input, EG level and LFO2 in, and its output out, at fixed steps; where that step falls on the wrong side of
-// the voice's page, the voice hears or answers a sample late. By the slot's chip channel, (s + 2) & 15, read
-// off the firmware's filter program.
+// The FS1R's serial schedule. The chip runs sixteen voices in four pages over one pass and moves each voice's input, EG level and LFO2 in, and its output out, at fixed steps; where that step falls on the wrong side of the voice's page, the voice hears or answers a sample late. By the slot's chip channel, (s + 2) & 15.
 struct Late { bool in, eg, lfo, out; };
 constexpr Late LATE[16] = {
     {0,0,0,0}, {0,1,1,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,1,1,0}, {0,0,0,1}, {0,0,0,1},
@@ -25,8 +21,7 @@ constexpr Late LATE[16] = {
 };
 }
 
-// A register write from the host (FilterHost, in the firmware's layout of the constants). Constants land in
-// the slot's VoiceFilter; the EG and LFO registers go to the modulators.
+// A register write from the host (FilterHost, in the FS1R's layout of the constants). Constants land in the slot's VoiceFilter; the EG and LFO registers go to the modulators.
 void Filter::Bank::write(uint32_t reg, uint32_t value) {
     using namespace vop3;
     const uint16_t v = (uint16_t)value;
@@ -77,8 +72,7 @@ void Filter::Bank::coef(int step, uint16_t v) {
 void Filter::Bank::setType(int s, int type) {
     using namespace fsvr::vop3host::filter;
     lanes.route[s] = type == BPF ? 1 : 2;
-    // ponytail: a type byte past BEF makes the unit read whatever register the byte names, which is another
-    // voice's state and not a filter. It plays silence here (docs/Differences.md): no tap.
+    // ponytail: a type byte past BEF makes the FS1R read whatever register the byte names, which is another voice's state and not a filter. It plays silence here (docs/Differences.md): no tap.
     static constexpr Lanes::Tap TAP[6] = {Lanes::LPF24, Lanes::LPF18, Lanes::LPF12, Lanes::HPF, Lanes::BPF, Lanes::BEF};
     for (int t = 0; t < Lanes::TAPS; t++) lanes.tap[t][s] = 0;
     if (type >= 0 && type <= BEF) lanes.tap[TAP[type]][s] = ~0ull;
@@ -113,10 +107,7 @@ void Filter::Bank::run(double v[SLOTS]) {
     if (mod.read(vop3::EG_STATUS)) host.egInterrupt();
 }
 
-// Ours: a bank past the unit's (Filter::run) rests once its sixteen slots have had nothing to do for a second, as
-// the engine does while nothing sounds: no input, no output, every filter's state at zero and every EG holding. An
-// input or a register write wakes it. What stops meanwhile is its LFO2s, which come back at another phase, as the
-// effect LFOs do after the engine sleeps (docs/Differences.md, more than 32 voices).
+// Ours: a bank past the FS1R's (Filter::run) rests once its sixteen slots have had nothing to do for a second, as the engine does while nothing sounds: no input, no output, every filter's state at zero and every EG holding. An input or a register write wakes it. What stops meanwhile is its LFO2s, which come back at another phase, as the effect LFOs do after the engine sleeps (docs/Differences.md, more than 32 voices).
 bool Filter::Bank::resting(const double* in) {
     for (int s = 0; s < SLOTS; s++) if (in[s] != 0.0) { rest = 0; asleep = false; return false; }
     if (asleep) return true;

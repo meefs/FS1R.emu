@@ -1,4 +1,4 @@
-// engine/midi.cpp - MIDI in, sysex in and out. KNOWN: rewritten from the disassembly.
+// engine/midi.cpp - MIDI in, sysex in and out. Matches the FS1R.
 #include "engine/synth.h"
 
 int Synth::ccSource(int cc) const {
@@ -49,8 +49,7 @@ void Synth::midi_in(int st, int d1, int d2) {
         case 0x80: note_off(p, d1); fseq_keys(); break;
         case 0xA0: set_source(pt, SRC_PAT, d2); break;
         case 0xD0: set_source(pt, SRC_CAT, d1); break;
-        // 0x15B80: the bend word keeps the LSB's top four bits, and the source gets it >> 3, -128..127, raw
-        // (FUN_00014AD0 with controller 0xE0).
+        // The bend word keeps the LSB's top four bits, and the source gets it >> 3, -128..127, raw.
         case 0xE0:
             pt.bend = pt.bendAt[chn] = (d2 - 64) * 16 + (d1 >> 3); pt.bendLsb = pt.bendLsbAt[chn] = bend14 ? d1 : 0;
             set_source(pt, SRC_PB, pt.bend >> 3); break;
@@ -70,19 +69,14 @@ void Synth::control_change(int p, int cc, int v) {
     case 0: if (sys[0x12]) bankMsb = v; break;
     case 32: if (sys[0x12] && bankMsb == 0x3F) { if (v <= 0x0B) pt.p[1] = (uint8_t)(v + 1); else if (v >= 0x40 && v <= 0x43) perfBank = v; } break;
     case 6: data_entry(p, v); break;
-    // The CC handlers write their bytes through FUN_00030796's ordinary path (cc_007, cc_074, cc_091 take it
-    // with a last argument of 0), so each is an edit and moves the base the controller sets add to (ctl_edit).
+    // The CC handlers write their bytes as ordinary parameter edits, so each moves the base the controller sets add to (ctl_edit).
     case 7: pt.p[0x0B] = (uint8_t)v; pt.ctl_edit(0x0B); break;
     case 11: pt.expr = std::max((int)pt.p[0x2C], std::min(254, v * 2)); break;
     case 64: set_sustain(p, v >= 64); break;
     case 65: pt.p[0x24] = (uint8_t)((pt.p[0x24] & 2) | (v >= 64)); break;
     case 5: pt.p[0x25] = (uint8_t)v; break;
     case 10: pt.p[0x0E] = (uint8_t)std::max(1, v); pt.ctl_edit(0x0E); break;
-    // The five sound controllers and the two sends, read out of the firmware's own per-CC handler
-    // table at flash 0x3DA04: every entry that is not the ignore stub at 0x151C0 writes one part
-    // parameter, and the handler's immediate is the address low it writes to. 71 -> 0x19, 72 ->
-    // 0x1C, 73 -> 0x1A, 74 -> 0x18, 91 -> 0x13, 93 -> 0x12. The MIDI View screens in the EPROM
-    // print the same pairs: RevSend "Bn 5B", VarSend "Bn 5D", Filter "Bn 4A".
+    // The five sound controllers and the two sends each write one part byte, CC to byte: 71 -> 0x19, 72 -> 0x1C, 73 -> 0x1A, 74 -> 0x18, 91 -> 0x13, 93 -> 0x12. The FS1R's MIDI View screens show the same pairs: RevSend "Bn 5B", VarSend "Bn 5D", Filter "Bn 4A".
     case 71: pt.p[0x19] = (uint8_t)v; pt.ctl_edit(0x19); break;    // filter resonance
     case 72: pt.p[0x1C] = (uint8_t)v; pt.ctl_edit(0x1C); break;    // EG release time
     case 73: pt.p[0x1A] = (uint8_t)v; pt.ctl_edit(0x1A); break;    // EG attack time

@@ -1,4 +1,4 @@
-// console/main.cpp - the test console on top of fs1r_lib: WinMM MIDI in and out, waveOut, offline render.
+// console/main.cpp - the test console on top of the engine library: WinMM MIDI in and out, waveOut, offline render.
 //
 //   fsvr_console.exe -l                                   list MIDI ports
 //   fsvr_console.exe -selftest                            run the engine self check
@@ -20,12 +20,12 @@
 #include <mutex>
 #include <string>
 #include <vector>
-#include "fs1r.h"
+#include "fsvr.h"
 #include "io/factory.h"
 #include "io/smf.h"
 
-using fs1r_smf::write_wav;
-using fs1r_smf::render_smf;
+using fsvr_smf::write_wav;
+using fsvr_smf::render_smf;
 static const int SR = (int)fsvr::ENGINE_RATE;    // the console runs the host at the engine rate
 static const int BLOCK = 128;                    // frames per waveOut buffer (~2.7 ms)
 static const int NBUF = 8;
@@ -72,7 +72,7 @@ static void pump_midi(fsvr::Device& dev) {
 }
 
 // ------------------------------------------------------------------------------------------ offline render
-// The render itself is io/smf.h's, shared with tools/render_capture.cpp.
+// The render itself is io/smf.h's, shared with tools/fsvr_render.cpp.
 static int g_note2 = -1;   // -n2: second note played at 1/3 while the first is held (mono legato / portamento)
 static std::vector<std::pair<int, int>> g_cc;   // -cc num=val: control changes sent before the note
 
@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
     dev.setSampleRate(SR);
     int midiPort = -1, midiOutPort = -1, pick = -1, perfIdx = -1, fseqIdx = -1, channel = -1;
     const char* syx = nullptr; const char* romPath = nullptr; const char* wav = nullptr; const char* smf = nullptr;
-    bool factory = false; fs1r_factory::Blobs blobs;   // -factory: the factory banks from plugin/generated, no EPROM
+    bool factory = false; fsvr_factory::Blobs blobs;   // -factory: the factory banks from plugin/generated, no EPROM
     int testNote = 60, monoTime = -1; double testSecs = 3.0;
     for (int i = 1; i < argc; i++) {
         std::string a = argv[i];
@@ -111,8 +111,8 @@ int main(int argc, char** argv) {
         else if (a == "-mono" && i + 1 < argc) monoTime = atoi(argv[++i]);
         else if (a == "-d" && i + 1 < argc) testSecs = atof(argv[++i]);
         else if (a == "-smf" && i + 1 < argc) smf = argv[++i];
-        else if (a == "-flt16") dev.setFilterPoly32(false);   // the unit's 16 filtered voices
-        else if (a == "-poly" && i + 1 < argc) dev.setPolyphony(atoi(argv[++i]));   // 32 (the unit's), 64, 96 or 128 voices
+        else if (a == "-flt16") dev.setFilterPoly32(false);   // the FS1R's 16 filtered voices
+        else if (a == "-poly" && i + 1 < argc) dev.setPolyphony(atoi(argv[++i]));   // 32 (the FS1R's), 64, 96 or 128 voices
         else if (a == "-factory") factory = true;
         else { printf("usage: fsvr_console [-l] [-selftest] [-m midiport] [-o midiout] [-c channel] [-v file.syx [-p index]]\n"
                       "                [-r eprom.bin | -factory] [-p voice] [-P performance] [-f fseq] [-g gain]\n"
@@ -121,23 +121,23 @@ int main(int argc, char** argv) {
     }
     if (romPath && !dev.loadRom(romPath)) { printf("cannot read 2 MB EPROM image %s\n", romPath); return 1; }
     if (factory && !blobs.load(argv[0])) { printf("cannot find plugin/generated: run from the repository, or set FSVR_ROOT\n"); return 1; }
-    if (perfIdx >= 0 && !(factory ? fs1r_factory::performance(dev, blobs, perfIdx) : dev.loadRomPerformance(perfIdx))) { printf("-P needs -r or -factory\n"); return 1; }
+    if (perfIdx >= 0 && !(factory ? fsvr_factory::performance(dev, blobs, perfIdx) : dev.loadRomPerformance(perfIdx))) { printf("-P needs -r or -factory\n"); return 1; }
     if (syx) {
         FILE* f = fopen(syx, "rb"); if (!f) { printf("cannot open %s\n", syx); return 1; }
         std::vector<uint8_t> d; uint8_t tmp[65536]; size_t n;
         while ((n = fread(tmp, 1, sizeof tmp, f)) > 0) d.insert(d.end(), tmp, tmp + n);
         fclose(f);
         if (!dev.loadSyx(d.data(), d.size(), std::max(0, pick), 0)) { printf("no FS1R voice/performance/Fseq or DX7 voice dump #%d found in %s\n", std::max(0, pick), syx); return 1; }
-    } else if (pick >= 0 && factory) fs1r_factory::voice(dev, blobs, 0, pick);
+    } else if (pick >= 0 && factory) fsvr_factory::voice(dev, blobs, 0, pick);
     else if (pick >= 0 && dev.romLoaded()) dev.loadRomVoice(0, pick);
-    if (fseqIdx >= 0 && !(factory ? fs1r_factory::fseq(dev, blobs, fseqIdx) : dev.loadRomFseq(fseqIdx))) { printf("-f needs -r or -factory\n"); return 1; }
-    if (monoTime >= 0) fs1r_smf::set_mono_porta(dev, monoTime);
+    if (fseqIdx >= 0 && !(factory ? fsvr_factory::fseq(dev, blobs, fseqIdx) : dev.loadRomFseq(fseqIdx))) { printf("-f needs -r or -factory\n"); return 1; }
+    if (monoTime >= 0) fsvr_smf::set_mono_porta(dev, monoTime);
     printf("performance \"%s\"", dev.performanceName());
     for (int p = 0; p < 4; p++) if (dev.partActive(p)) printf("  part%d \"%s\" alg %d", p + 1, dev.voiceName(p), dev.algorithm(p) + 1);
     if (dev.fseqFrames()) printf("  fseq \"%s\" (%d frames)", dev.fseqName(), dev.fseqFrames());
     printf("\n");
     if (smf) { if (!wav) { printf("-smf needs -w out.wav\n"); return 1; } return render_smf(dev, smf, wav, testSecs); }
-    if (wav) return fs1r_smf::render_note(dev, wav, testNote, testSecs, g_note2, g_cc);
+    if (wav) return fsvr_smf::render_note(dev, wav, testNote, testSecs, g_note2, g_cc);
 
     std::string ini = ini_path();
     if (midiPort < 0) { FILE* f = fopen(ini.c_str(), "r"); if (f) { if (fscanf(f, "midi_in=%d", &midiPort) != 1) midiPort = -1; fclose(f); } }
@@ -176,8 +176,8 @@ int main(int argc, char** argv) {
         pump_midi(dev);
         dev.process(fl, fr, BLOCK);
         for (int i = 0; i < BLOCK; i++) {
-            pcm[cur][2 * i] = fs1r_smf::to_s16(fl[i]);
-            pcm[cur][2 * i + 1] = fs1r_smf::to_s16(fr[i]);
+            pcm[cur][2 * i] = fsvr_smf::to_s16(fl[i]);
+            pcm[cur][2 * i + 1] = fsvr_smf::to_s16(fr[i]);
         }
         h.dwFlags &= ~WHDR_DONE;
         waveOutWrite(hwo, &h, sizeof(WAVEHDR));

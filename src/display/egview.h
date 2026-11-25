@@ -53,8 +53,7 @@ template <class F> double between(double x, F f) {
     return u == 0 ? f(i) : f(i) + u * (f(i + 1) - f(i));
 }
 
-// Copies from engine/synth.h (egrate, rate_secs, eg_ratescale, EG::lvl_db). Keep them in step.
-// The KEYOFF table is measured, see docs/aeg.md.
+// Copies from tonegen/envelope.h (egrate, rate_secs, eg_ratescale, EG::lvl_db). Keep them in step.
 inline int eg_rate(int t) { return ((99 - ci(t, 0, 99)) * 0xA4) >> 8; }
 inline double rate_secs(int q) { q = ci(q, 0, 63); return std::pow(2.0, 26 - (q >> 2)) / (4 + (q & 3)) / SR; }
 inline int rate_scale(int tscale, int c0) {

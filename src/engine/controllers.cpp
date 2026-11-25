@@ -1,7 +1,7 @@
-// engine/controllers.cpp - the eight controller sets and the 48 destinations. KNOWN: rewritten from the disassembly.
+// engine/controllers.cpp - the eight controller sets and the 48 destinations. Matches the FS1R.
 #include "engine/synth.h"
 
-int Synth::scale_f032(int v, int d, int base) {
+int Synth::ctrl_scale_wide(int v, int d, int base) {
     int r = clampi((ctrl_bias(v) * ctrl_bias(d) * 2) >> 6, -128, 32767);
     if (r > 0) r = std::min(r - 1, 127);
     return clampi(base + r, 0, 127);
@@ -23,7 +23,7 @@ bool Synth::ctrl_set_active(int part, int set, int dest) const {
 int Synth::ctrl_offset(int part, int dest) const {
     for (int s = 7; s >= 0; s--)
         if (ctrl_set_active(part, s, dest))
-            return scale_f9c(ctrl_set_sum(part, s), perf.c[0x48 + s] - 64);
+            return ctrl_scale_offset(ctrl_set_sum(part, s), perf.c[0x48 + s] - 64);
     return 0;
 }
 
@@ -37,21 +37,16 @@ void Synth::fx_controls(int part) {
 }
 
 int Synth::ctrl_part(int part, int dest, int stored) const {
-    bool wide = dest == 17 || dest == 19 || dest == 20;     // volume and the two sends use FUN_00017032
+    bool wide = dest == 17 || dest == 19 || dest == 20;     // volume and the two sends use ctrl_scale_wide
     for (int s = 7; s >= 0; s--)
         if (ctrl_set_active(part, s, dest)) {
             int v = ctrl_set_sum(part, s), d = perf.c[0x48 + s] - 64;
-            return wide ? scale_f032(v, d, stored) : scale_f58(v, d, stored);
+            return wide ? ctrl_scale_wide(v, d, stored) : ctrl_scale_byte(v, d, stored);
         }
     return clampi(stored, 0, 127);
 }
 
-// FUN_00014DDC's destinations 17 to 33, when one of the part's sources moves: each handler writes its part
-// byte as the base copy plus the scaled controller (ctrlDest_17 .. ctrlDest_33, Part::CTL_BYTE), and the
-// highest set on a destination is the one left standing. A destination no set names is not touched. The pan
-// handler leaves a random pan (0) alone and keeps 0 out of a result, which would turn the part random.
-// Everything that plays reads the bytes, so a controller is heard where the editor shows it and a dump
-// carries it, as the unit's edit buffer does.
+// Destinations 17 to 33, when one of the part's sources moves: each handler writes its part byte (Part::CTL_BYTE) as the base copy plus the scaled controller, and the highest set on a destination is the one left standing. A destination no set names is not touched. The pan handler leaves a random pan (0) alone and keeps 0 out of a result, which would turn the part random. Everything that plays reads the bytes, so a controller is heard where the editor shows it and a dump carries it, as the FS1R's edit buffer does.
 void Synth::ctrl_write(int part) {
     Part& pt = perf.part[part];
     for (int k = 0; k < 17; k++) {
@@ -86,17 +81,15 @@ int Synth::ctrl_eg_bias(int part) const {
     for (int s = 0; s < 8; s++) {
         if (!ctrl_set_active(part, s, 35)) continue;
         int d = perf.c[0x48 + s] - 64;
-        int r = (std::abs(scale_f9c(ctrl_set_sum(part, s), d)) + DEPTHTERM[std::min(31, std::abs(d))]) * 2;
+        int r = (std::abs(ctrl_scale_offset(ctrl_set_sum(part, s), d)) + DEPTHTERM[std::min(31, std::abs(d))]) * 2;
         if (r > 0xFD) r = 0xFF;
-        out = (~r) & 0xFF;                  // ctrlDest_35 stores DAT_01029738[part]: the last set wins
+        out = (~r) & 0xFF;                  // one per-part value: the last set wins
     }
     return out < 0 ? 0 : out;
 }
 
-// FUN_0002022C: the pitch takes bend >> 3, (msb - 64) * 2 + (lsb >> 6), 256 steps. Ours (docs/Differences.md):
-// the LSB's low six bits, which that drops, go on as a fraction of its step, so a 14-bit bend glides between
-// the unit's positions and gives exactly the unit's word wherever they are 0. Not past the top, where the
-// firmware turns 0x7F into 0x80.
+// The FS1R's pitch takes bend >> 3, (msb - 64) * 2 + (lsb >> 6), 256 steps.
+// Ours (docs/Differences.md): the LSB's low six bits, which that drops, go on as a fraction of its step, so a 14-bit bend glides between the FS1R's positions and gives exactly the FS1R's word wherever they are 0. Not past the top, where the FS1R turns 0x7F into 0x80.
 // A part on a range of channels bends each note by what its own channel last sent (Data List 2.2.4).
 double Synth::bend_word(const Part& pt, int chn) const {
     const int part = (int)(&pt - perf.part);
@@ -133,7 +126,7 @@ void Synth::refresh_bias(Chan& C, const Part& pt) {
         C.bwReg[o] = clampi(v.bw + bo, 0, 99);
         int ubo = BWBIAS[u.bwbias & 0xF] ? clampi((cu * BWBIAS[u.bwbias & 0xF]) >> 3, -128, 127) : 0;
         C.ubwReg[o] = clampi(eb70(u.bw) + ubo, 0, 127);
-        // EG bias attenuation (event 0x205): |sens| * EGBIAS[ctrl or 255-ctrl] >> 3
+        // EG bias attenuation: |sens| * EGBIAS[ctrl or 255-ctrl] >> 3
         auto bias = [&](int sn) { if (!sn) return 0; int idx = sn < 0 ? 255 - cb : cb; return std::min(255, (std::abs(sn) * EGBIAS[idx]) >> 3); };
         C.egbias[o] = bias(v.egbias); C.uegbias[o] = bias(u.egbias);
     }

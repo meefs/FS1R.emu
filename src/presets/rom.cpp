@@ -1,4 +1,4 @@
-// presets/rom.cpp - EPROM and sysex loading, and the parameter map. KNOWN.
+// presets/rom.cpp - EPROM and sysex loading, and the parameter map. Matches the FS1R.
 #include "engine/synth.h"
 
 bool load_rom(Rom& R, const char* path) {
@@ -26,16 +26,10 @@ int bank_voice_index(int bank, int prog) {
 
 void perf_from_bytes(Synth& S, const Rom* R, const uint8_t* d) {
     Perf& P = S.perf;
-    // The unit stops the sound before it takes a performance, and it is all sound off rather than all notes
-    // off: the notes are cut where they are rather than released (mkruselj, on his own FS1R). So the channels
-    // go while they still belong to the performance that owned them, before any of its bytes change. Until
-    // this was here only the plug-in's own preset browser did it, so a performance bulk from a host, an
-    // editor or the MIDI in left notes sounding, and they carried on through the new performance's voices.
-    // The bulk handler does the same (FUN_0003d0dc: FUN_000195ac(0), every channel).
+    // The FS1R stops the sound before it takes a performance, and it is all sound off rather than all notes off: the notes are cut where they are rather than released. So the channels go while they still belong to the performance that owned them, before any of its bytes change.
+    // A performance bulk does the same, on every channel, so one from a host, an editor or the MIDI in leaves no note carrying on through the new performance's voices.
     S.all_off();
-    // FUN_0000f2f0 puts every part's last pitch (0x0102885C) at 0x53AA, so a part with portamento in full-time
-    // mode glides its first note in from that word. MEASURED 2026-10-26 (FS1R.unlock 2026-10-26-open, takes 9 and
-    // 11): Teck Hook's part 1 struck on a fresh load starts near 179 Hz and settles on 129.6 by 100 ms.
+    // Loading a performance puts every part's last pitch at 0x53AA, so a part with portamento in full-time mode glides its first note in from that word: Teck Hook's part 1 struck on a fresh load starts near 179 Hz and settles on 129.6 by 100 ms.
     memcpy(P.c, d, 80); memcpy(P.fx, d + 80, 112);
     for (int i = 0; i < 4; i++) {
         Part& pt = P.part[i]; memcpy(pt.p, d + 192 + 52 * i, 52); pt.fill_ctl_base(); pt.nheld = 0; pt.lastPitch = 0x53AA; pt.reset_ctl();
@@ -84,8 +78,7 @@ bool load_sysex(Synth& S, const Rom* R, const uint8_t* d, size_t len, int pick, 
             if (i + 9 + bc + 2 > len) break;
             if (bc == 608 && ((ah >= 0x40 && ah <= 0x43) || ah == 0x51)) {
                 if (found++ != pick) continue;
-                // A voice for a part silences it first (FUN_0003d0dc: FUN_000195ac(1, part), FUN_00010384(0)),
-                // so a note of the old voice still releasing does not play on with the new one.
+                // A voice for a part silences it first, so a note of the old voice still releasing does not play on with the new one.
                 int pi = ah <= 0x43 ? ah - 0x40 : part;
                 S.silence_part(pi);
                 memcpy(S.perf.part[pi].voice.raw, p, 608); decode_voice(S.perf.part[pi].voice); return true;
@@ -111,7 +104,7 @@ bool load_sysex(Synth& S, const Rom* R, const uint8_t* d, size_t len, int pick, 
         } else if (d[i + 3] == 0x00 && d[i + 4] == 0x01 && d[i + 5] == 0x1B) {
             if (i + 6 + 155 + 2 > len) break;
             if (found++ != pick) continue;
-            S.silence_part(part);                                    // FUN_0003d370: FUN_000195ac(1, 0)
+            S.silence_part(part);                                    // the part goes silent first, as for a voice bulk
             convert_dx7(d + i + 6, S.perf.part[part].voice.raw); decode_voice(S.perf.part[part].voice); return true;
         }
     }
@@ -149,8 +142,7 @@ bool write_param(Synth& S, int ah, int am, int al, int val) {
     }
     if (ah == 0x10 && ((am == 0 && al >= 0x50) || am == 1)) { int i = am ? 48 + al : al - 0x50; if (i >= 112) return false; S.perf.fx[i] = v; return true; }
     if (ah >= 0x30 && ah <= 0x33 && am == 0 && al < 52) {
-        // The firmware runs a part byte's handler on every write; only a change runs it here, so a host
-        // re-sending a value it already sent does not cut the part's notes.
+        // The FS1R runs a part byte's handler on every write; only a change runs it here, so a host re-sending a value it already sent does not cut the part's notes.
         Part& pt = S.perf.part[ah - 0x30]; const int was = pt.p[al];
         pt.p[al] = v; pt.ctl_edit(al);
         if (was != v) S.part_written(ah - 0x30, al, was);
@@ -159,8 +151,7 @@ bool write_param(Synth& S, int ah, int am, int al, int val) {
     if (ah >= 0x40 && ah <= 0x43 && am == 0 && al < 112) {
         Voice& V = S.perf.part[ah - 0x40].voice; const int edited = V.corrEdit, was = V.raw[al];
         V.raw[al] = v; decode_voice(V);
-        // An algorithm change rebuilds the words with the carrier test; an OP Att edit skips it (Voice::corrEdit).
-        // MEASURED (FS1R.unlock 2026-10-26-open, takes 2 and 5): writing the algorithm it already has keeps the edit.
+        // An algorithm change rebuilds the words with the carrier test; an OP Att edit skips it (Voice::corrEdit). Writing the algorithm it already has keeps the edit.
         V.corrEdit = al == 0x2C && v != was ? 0 : al >= 0x2D && al <= 0x34 ? edited | 1 << (al - 0x2D) : edited;
         S.voice_changed(ah - 0x40); return true;
     }

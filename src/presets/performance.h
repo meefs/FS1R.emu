@@ -1,4 +1,4 @@
-// presets/performance.h - performance, part and Fseq data. KNOWN.
+// presets/performance.h - performance, part and Fseq data. Matches the FS1R.
 #pragma once
 #include <algorithm>
 #include <cstddef>
@@ -18,43 +18,30 @@ struct Fseq {
         memcpy(frame, f, (size_t)nframes * 50); valid = true;
     }
 };
-// Performance banks in the EPROM table of 384: the three preset banks, 128 each, in order A, B, C.
-// The Data List's performance lists match them entry for entry - "Zap !" is Preset A 1, "Sweepy Voice"
-// Preset B 1 and "UprightPiano" Preset C 1 - and the manual's own description of Preset C settles that
-// last one on its own: it is the bank for the G50 guitar controller, "the maximum MIDI receive channel
-// for these voices is 6, and the pitch bend range is -12 ... +12" (owner's manual page 21), which is
-// exactly what entries 256-383 hold and nothing else does. INTERNAL is the user's own battery-backed
-// bank, not ROM, so a bank select for it lands on Preset A, which is what the unit ships holding.
+// Performance banks in the EPROM table of 384: the three preset banks, 128 each, in order A, B, C, matching the Data List's performance lists entry for entry ("Zap !" is Preset A 1, "Sweepy Voice" Preset B 1 and "UprightPiano" Preset C 1).
+// Preset C is the bank for the G50 guitar controller, "the maximum MIDI receive channel for these voices is 6, and the pitch bend range is -12 ... +12" (owner's manual page 21), which is exactly what entries 256-383 hold and nothing else does.
+// INTERNAL is the user's own battery-backed bank, not ROM, so a bank select for it lands on Preset A, which is what the FS1R ships holding.
 
 struct Part {
     uint8_t p[52]; Voice voice;
     // controller state (MIDI)
-    int bend = 0;            // (msb - 64) * 16 + (lsb >> 3), the handler at 0x15B80 (DAT_010293F4)
+    int bend = 0;            // (msb - 64) * 16 + (lsb >> 3)
     int bendLsb = 0;         // ours: the whole LSB, for a 14-bit bend (bend_word)
     // The same pair as each MIDI channel last sent it. A part that receives a range of channels bends each
     // note by its own channel's (Data List 2.2.4, "can sound separately according to Pitch Bend Change on
     // different channels"); bend and bendLsb stay the last received, which the PB source reads.
     int bendAt[16] = {}, bendLsbAt[16] = {};
-    int expr = 254;          // DAT_010297fa
-    // FUN_0000edf0, the per-part controller reset: expression back to 0xFE, bend and every controller
-    // source to zero. Reset All Controllers runs it, and so does loading a performance, which walks the
-    // four parts calling it (FUN_0000f2f0). MEASURED on the unit the same way: 08_panlevel_2 sweeps
-    // expression down to 112 and then sends a performance bulk, and every balance segment after it reads
-    // full level on the hardware where the engine stayed 3.01 dB down for the rest of the file.
+    int expr = 254;
+    // The per-part controller reset: expression back to 0xFE, bend and every controller source to zero. Reset All Controllers runs it, and so does loading a performance, which walks the four parts calling it, so a performance bulk after an expression change plays at full level.
     void reset_ctl();
-    // Controller sources in the firmware's own bit order (FUN_000191C0): KN1-4, MC1, MC2, PB, CAT,
-    // PAT, FC, BC, MC3, MW, MC4. The knobs and MIDI controls are stored bipolar as (v - 64) * 2, the
-    // physical controllers as the raw value, so the range is -128..127 either way.
+    // Controller sources in the FS1R's own bit order: KN1-4, MC1, MC2, PB, CAT, PAT, FC, BC, MC3, MW, MC4.
+    // The knobs and MIDI controls are stored bipolar as (v - 64) * 2, the physical controllers as the raw value, so the range is -128..127 either way.
     int src[14] = {};
     int held[32]; int nheld = 0; int lastPitch = -1;   // mono handling and portamento start
     int rpnM = 127, rpnL = 127; bool nrpnSel = false;   // RPN / NRPN selection state
     bool sustain = false;
-    // Controller destinations 17 to 33 edit part bytes, and each handler (pointer table at flash 0x3DC04) writes
-    // its byte as a copy of the byte plus the scaled controller, through FUN_00030796's controller path, which
-    // leaves the copy alone: the copy is 17 bytes a part at 0x01029618, in destination order, filled from the
-    // part at a load (FUN_000302A0) and by every ordinary parameter change, a MIDI CC's included
-    // (FUN_00030264). So the byte reads as the unit's edit buffer does, a controller never compounds on
-    // itself, and an edit moves the base the controller works from.
+    // Controller destinations 17 to 33 edit part bytes, and each writes its byte as a copy of the byte plus the scaled controller, leaving the copy alone. The copy is 17 bytes a part, in destination order, filled from the part at a load and by every ordinary parameter change, a MIDI CC's included.
+    // So the byte reads as the FS1R's edit buffer does, a controller never compounds on itself, and an edit moves the base the controller works from.
     static constexpr uint8_t CTL_BYTE[17] = {0x0B, 0x0E, 0x13, 0x12, 0x18, 0x19, 0x1F, 0x1A, 0x1B, 0x1C, 0x20, 0x21, 0x22, 0x23, 0x0A, 0x1D, 0x1E};
     uint8_t ctlBase[17] = {};
     void fill_ctl_base() { for (int k = 0; k < 17; k++) ctlBase[k] = p[CTL_BYTE[k]]; }

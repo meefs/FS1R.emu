@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
 """Pull the 15 demo songs out of the FS1R v1.20 EPROM image and write them as standard MIDI files.
 
-    python tools/extract_demo.py   -> captures/demo/NN_Name.mid   (one file per song)
-                                     captures/demo/all.mid        (all 15 back to back, as the unit plays them)
+    python tools/extract_demo.py   -> demosongs/NN_Name.mid   (one file per song)
+                                     demosongs/all.mid        (all 15 back to back, as the FS1R plays them)
 
-Format, read out of the player at flash 0x0002E8B8 (the event loop), 0x0002EACA (fetch a byte and
-advance) and 0x0002EC0C (load the song pointer). It is the same byte stream Yamaha used in the TG100,
-MU and VL70-m, so ValleyBell's YamahaDemoSongDump reads it too, with one wrinkle: this ROM puts an
-`FF 00` before every sysex block and an `F1 00` at the top of every song, and the firmware simply
-drops them. The fetch loop skips any byte with bit 7 clear, and 0xFF and 0xF1 fall through every
-status comparison, so both pairs are two bytes of nothing.
+The format is the same byte stream Yamaha used in the TG100, MU and VL70-m, so ValleyBell's YamahaDemoSongDump reads it too, with one wrinkle: this ROM puts an `FF 00` before every sysex block and an `F1 00` at the top of every song, and the FS1R simply drops them. The player's fetch loop skips any byte with bit 7 clear, and 0xFF and 0xF1 fall through every status comparison, so both pairs are two bytes of nothing.
 
   0x80-0xE0  running MIDI, 3 bytes for 8n/9n/An/Bn/En and 2 for Cn/Dn. Note off carries a velocity.
   0xF0       sysex, up to and including 0xF7. The demo loads its own performances and voices this way.
@@ -17,22 +12,11 @@ status comparison, so both pairs are two bytes of nothing.
   0xF3 dd    delay, dd >> 2 ticks of the player's own counter.
   0xF4 lo hi delay, ((lo & 0x7F) | (hi << 7)) >> 2 ticks.
 
-The player's counter is stepped every fourth period of the timer ISR at flash 0x0002F250, and every
-delay in the ROM is a multiple of four, so a delay of `dd` is dd/4 counter periods. The ISR does not
-set its compare register to a fixed period: at 0x0002F28C it reads the running count, adds 0x1116 and
-writes that back, so every period is the nominal 28 MHz / 16 / 4374 = 2.5 ms plus however long the
-interrupt took to get there. Fourteen register pushes into a 4374-count period is a percent or three,
-and rgwan's recording puts it at four: the distance between consecutive songs in his take of the whole
-demo is 1.040 times what this file computes at the nominal rate, on all fifteen songs, with no reload
-gap left over to explain it away.
+The player's counter is stepped every fourth period of the timer ISR, and every delay in the ROM is a multiple of four, so a delay of `dd` is dd/4 counter periods. The ISR does not set its compare register to a fixed period: it reads the running count, adds 0x1116 and writes that back, so every period is the nominal 28 MHz / 16 / 4374 = 2.5 ms plus however long the interrupt took to get there. Fourteen register pushes into a 4374-count period is a percent or three, and on the FS1R it comes to four: consecutive songs lie 1.040 times as far apart as the nominal rate gives, on all fifteen songs.
 
-So one counter period is 10.4 ms rather than 10.0. The SMF below is written at 200 ticks per quarter
-with a 520000 us quarter, which is 2.6 ms a tick, and each delay is emitted as (raw >> 2) * 4 ticks:
-one ISR period per tick. Before this the renders drifted 4 % against the recording, which is what held
-the envelope correlations down.
+So one counter period is 10.4 ms rather than 10.0. The SMF below is written at 200 ticks per quarter with a 520000 us quarter, which is 2.6 ms a tick, and each delay is emitted as (raw >> 2) * 4 ticks: one ISR period per tick.
 
-The 15 songs run 503 s of events at that rate. The reference recording of the whole demo is 523 s,
-so the unit spends roughly a second between songs reloading; --gap sets that for all.mid.
+The 15 songs run 503 s of events at that rate. The FS1R plays the whole demo in 523 s, so it spends roughly a second between songs reloading; --gap sets that for all.mid.
 """
 import argparse
 import re
@@ -42,9 +26,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ROM = ROOT.parent / "FS1R_DISASM" / "roms" / "fs1r_v120_eprom_cpuview.bin"
-OUT = ROOT / "captures" / "demo"
+OUT = ROOT / "demosongs"
 BASE = 0x200000
-PTRS, NSONGS = 0x389160, 15          # the pointer table the player indexes, flash literal at 0x0002EC28
+PTRS, NSONGS = 0x389160, 15          # the pointer table the player indexes
 RES = 200                            # ticks per quarter
 TEMPO = 520000                       # us per quarter: 2.6 ms a tick, one period of the player's counter
 EVLEN = {0x80: 3, 0x90: 3, 0xA0: 3, 0xB0: 3, 0xC0: 2, 0xD0: 2, 0xE0: 3}

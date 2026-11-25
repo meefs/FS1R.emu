@@ -1,14 +1,8 @@
 // effects/programs.h - the FS1R's effect programs as plain DSP, and the state they share. Ours.
 //
-// The firmware runs its effects as programs on a DSP: the base program (the mixer, the sends and returns,
-// the master EQ and the reverb), and four windows into it that each hold one of the EPROM's programs for
-// the effect types selected: aux, the reverb delay, the variation and the insertion. Each program below is
-// one of those, as the arithmetic it computes, one function a sample. Effects (effects.h) runs the five
-// the host has loaded, in the order the chip runs them, on one State.
+// The FS1R runs its effects as programs on a DSP: the base program (the mixer, the sends and returns, the master EQ and the reverb), and four windows into it that each hold one of the FS1R's programs for the effect types selected: aux, the reverb delay, the variation and the insertion. Each program below is one of those, as the arithmetic it computes, one function a sample. Effects (effects.h) runs the five the host has loaded, in the order the chip runs them, on one State.
 //
-// The programs talk to each other only through the State: the stereo sends in r[3]..r[8], the returns in
-// r[9]..r[18], a few cells and the delay memory. Their arithmetic is the unit's, in its number format
-// (dsp/word.h) and its order, so the section is bit for bit the unit's DSP; tools/dsp_check pins it.
+// The programs talk to each other only through the State: the stereo sends in r[3]..r[8], the returns in r[9]..r[18], a few cells and the delay memory. Their arithmetic is the FS1R's, in its number format (dsp/word.h) and its order, so the section computes exactly what the FS1R's DSP does; tests/dsp_check pins it.
 //
 // Most programs are still straight-line arithmetic over numbered registers. aux_window.cpp and var_m07.cpp show the
 // form they are headed for: name the DSP blocks, keep every operation and its order, run dsp_check.

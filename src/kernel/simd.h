@@ -3,7 +3,7 @@
 // A kernel file is compiled once per instruction set, FSVR_ISA picking the lane type and the namespace it lands
 // in (0 scalar, 1 sse2, 2 avx2, 3 neon; kernel/README.md). Every operation here does per lane exactly what the
 // scalar code does, in the same order, so a kernel over W slots or channels renders their samples to the bit;
-// the hashes (dsp_check, tools/abcheck.py) hold it to that. The rules the exactness rests on:
+// the hashes (dsp_check, tests/abcheck.py) hold it to that. The rules the exactness rests on:
 //   - min(a, b) is a < b ? a : b and max(a, b) is a > b ? a : b, the second operand on a tie or a NaN, as the
 //     x86 instructions are; the scalar code's clamps are written that way round (dsp/word.h).
 //   - select(m, a, b) is a where the mask is set, b elsewhere: a masked path is never arithmetic with a 0 or 1.

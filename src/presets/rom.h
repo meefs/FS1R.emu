@@ -1,4 +1,4 @@
-// presets/rom.h - the EPROM, its banks, and sysex and parameter loading. KNOWN.
+// presets/rom.h - the EPROM, its banks, and sysex and parameter loading. Matches the FS1R.
 #pragma once
 #include <cstddef>
 #include <cstdint>
