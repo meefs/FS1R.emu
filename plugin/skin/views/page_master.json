@@ -9,7 +9,7 @@
    "name": "perf_frame",
    "rect": [
     14,
-    51,
+    300,
     330,
     221
    ],
@@ -37,7 +37,7 @@
    "name": "master_frame",
    "rect": [
     14,
-    300,
+    51,
     330,
     221
    ],
@@ -79,7 +79,7 @@
    "name": "perf_title",
    "rect": [
     14,
-    31,
+    280,
     124,
     20
    ],
@@ -129,7 +129,7 @@
    "name": "master_title",
    "rect": [
     14,
-    280,
+    31,
     89,
     20
    ],
@@ -204,7 +204,7 @@
    "name": "volume_label",
    "rect": [
     12,
-    60,
+    309,
     80,
     21
    ],
@@ -226,7 +226,7 @@
    "name": "volume_track",
    "rect": [
     42,
-    81,
+    330,
     20,
     173
    ],
@@ -239,7 +239,7 @@
    "name": "volume",
    "rect": [
     31,
-    81,
+    330,
     42,
     173
    ],
@@ -256,7 +256,7 @@
    "name": "volume_value",
    "rect": [
     22,
-    252,
+    501,
     60,
     22
    ],
@@ -282,7 +282,7 @@
    "name": "pan_label",
    "rect": [
     94,
-    60,
+    309,
     80,
     21
    ],
@@ -304,7 +304,7 @@
    "name": "pan",
    "rect": [
     106,
-    81,
+    330,
     56,
     56
    ],
@@ -320,7 +320,7 @@
    "name": "pan_value",
    "rect": [
     104,
-    138,
+    387,
     60,
     22
    ],
@@ -346,7 +346,7 @@
    "name": "perf_0_label",
    "rect": [
     100,
-    175,
+    424,
     88,
     18
    ],
@@ -370,7 +370,7 @@
    "name": "perf_0",
    "rect": [
     192,
-    175,
+    424,
     140,
     18
    ],
@@ -494,7 +494,7 @@
    "name": "perf_1_label",
    "rect": [
     100,
-    203,
+    452,
     88,
     18
    ],
@@ -518,7 +518,7 @@
    "name": "perf_1",
    "rect": [
     192,
-    203,
+    452,
     140,
     18
    ],
@@ -547,7 +547,7 @@
    "name": "perf_2_label",
    "rect": [
     100,
-    231,
+    480,
     88,
     18
    ],
@@ -571,7 +571,7 @@
    "name": "perf_2",
    "rect": [
     192,
-    231,
+    480,
     140,
     18
    ],
@@ -1209,10 +1209,88 @@
   },
   {
    "type": "plate",
+   "name": "master_volume_label",
+   "rect": [
+    12,
+    60,
+    80,
+    21
+   ],
+   "layer": 1,
+   "text": {
+    "text": "Volume",
+    "font": "caption_grey_12",
+    "align": "center"
+   },
+   "pad": [
+    2,
+    2,
+    2,
+    2
+   ]
+  },
+  {
+   "type": "plate",
+   "name": "master_volume_track",
+   "rect": [
+    42,
+    81,
+    20,
+    173
+   ],
+   "fill": {
+    "image": "faders/track_narrow"
+   }
+  },
+  {
+   "type": "dial",
+   "name": "master_volume",
+   "rect": [
+    31,
+    81,
+    42,
+    173
+   ],
+   "image": "faders/pot_cap",
+   "slider": true,
+   "sensitivity": 1.5,
+   "fine": 0.2,
+   "wheel": 0.09,
+   "reset": "default",
+   "param": "master.volume"
+  },
+  {
+   "type": "number",
+   "name": "master_volume_value",
+   "rect": [
+    22,
+    252,
+    60,
+    22
+   ],
+   "text": {
+    "text": "",
+    "font": "value_dark_12",
+    "align": "center",
+    "valign": "middle"
+   },
+   "pad": [
+    2,
+    2,
+    2,
+    2
+   ],
+   "fine": 0.2,
+   "reset": false,
+   "editable": true,
+   "param": "master.volume"
+  },
+  {
+   "type": "plate",
    "name": "tune_label",
    "rect": [
-    20,
-    310,
+    94,
+    60,
     80,
     21
    ],
@@ -1233,8 +1311,8 @@
    "type": "dial",
    "name": "tune",
    "rect": [
-    32,
-    331,
+    106,
+    81,
     56,
     56
    ],
@@ -1249,8 +1327,8 @@
    "type": "number",
    "name": "tune_value",
    "rect": [
-    30,
-    388,
+    104,
+    138,
     60,
     22
    ],
@@ -1276,7 +1354,7 @@
    "name": "master_0_label",
    "rect": [
     100,
-    331,
+    175,
     88,
     18
    ],
@@ -1300,7 +1378,7 @@
    "name": "master_0",
    "rect": [
     192,
-    331,
+    175,
     140,
     18
    ],
@@ -1329,7 +1407,7 @@
    "name": "master_1_label",
    "rect": [
     100,
-    359,
+    203,
     88,
     18
    ],
@@ -1353,7 +1431,7 @@
    "name": "master_1",
    "rect": [
     192,
-    359,
+    203,
     140,
     18
    ],
@@ -1405,7 +1483,7 @@
    "name": "master_2_label",
    "rect": [
     100,
-    387,
+    231,
     88,
     18
    ],
@@ -1429,7 +1507,7 @@
    "name": "master_2",
    "rect": [
     192,
-    387,
+    231,
     140,
     18
    ],
