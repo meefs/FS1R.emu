@@ -12,7 +12,7 @@
 
 # Introduction
 
-<b>A millenial FM monster, reborn.</b>
+<b>A millennial FM monster, reborn.</b>
 
 **Discord:** https://discord.gg/6sXu3GmkNm
 
